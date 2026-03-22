@@ -42,14 +42,14 @@ $mailable = (new Mailable())
 $builder = new MimeBuilder();
 
 // Warm-up
-$builder->build($mailable);
+$builder->build($mailable, '', '');
 
 // ── Benchmark ─────────────────────────────────────────────────────────────────
 
 $start = hrtime(true);
 
 for ($i = 0; $i < ITERATIONS; $i++) {
-    $builder->build($mailable);
+    $builder->build($mailable, '', '');
 }
 
 $end = hrtime(true);
