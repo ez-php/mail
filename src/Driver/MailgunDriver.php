@@ -134,7 +134,7 @@ final class MailgunDriver implements MailerInterface
      * Configure the cURL handle and execute the Mailgun API request.
      *
      * @param CurlHandle                     $ch       Initialised cURL handle.
-     * @param string                          $endpoint Full API URL.
+     * @param non-empty-string               $endpoint Full API URL.
      * @param array<string, string|CURLFile> $fields   Form fields to POST.
      *
      * @throws MailException On cURL errors or non-2xx HTTP responses.
