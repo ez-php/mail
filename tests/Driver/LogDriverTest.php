@@ -143,4 +143,29 @@ final class LogDriverTest extends TestCase
         $this->assertIsString($content);
         $this->assertStringContainsString('To: plain@example.com', $content);
     }
+
+    public function testSendWithEmptyPathWritesViaErrorLog(): void
+    {
+        $tmpLog = tempnam(sys_get_temp_dir(), 'ez-php-mail-errlog-');
+        assert(is_string($tmpLog));
+
+        $previous = ini_set('error_log', $tmpLog);
+
+        try {
+            $driver = new LogDriver('');
+            $driver->send(
+                (new Mailable())
+                    ->to('dev@example.com')
+                    ->subject('ErrorLog Subject')
+                    ->text('body')
+            );
+
+            $content = file_get_contents($tmpLog);
+            $this->assertIsString($content);
+            $this->assertStringContainsString('ErrorLog Subject', $content);
+        } finally {
+            ini_set('error_log', is_string($previous) ? $previous : '');
+            unlink($tmpLog);
+        }
+    }
 }
