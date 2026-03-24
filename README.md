@@ -172,3 +172,86 @@ Mail::resetMailer();
 - `multipart/mixed` (any of the above + attachments)
 - RFC 2047 encoding for non-ASCII subject lines and display names
 - Base64-encoded attachments with MIME type detection via `mime_content_type()`
+
+---
+
+## Queue Integration
+
+Mail delivery is synchronous by default — `Mail::send()` blocks until the driver finishes. To dispatch mail asynchronously, wrap the call in a queue job:
+
+```php
+use EzPhp\Contracts\JobInterface;
+use EzPhp\Mail\Mail;
+use EzPhp\Mail\Mailable;
+
+final class SendMailJob implements JobInterface
+{
+    public function __construct(private readonly Mailable $mailable) {}
+
+    public function handle(): void
+    {
+        Mail::send($this->mailable);
+    }
+}
+
+// Dispatch from a controller or service
+$queue->push(new SendMailJob(
+    (new Mailable())
+        ->to($user->email, $user->name)
+        ->subject('Welcome!')
+        ->text('Hello, welcome aboard.')
+));
+```
+
+The `Mailable` is serialized with the job. `Mail::send()` inside `handle()` uses whatever driver is registered in the worker process — typically `SmtpDriver` in production and `NullDriver` or `LogDriver` in development.
+
+> **Note:** Queue-backed delivery is an application-layer concern. The `ez-php/mail` package has no dependency on `ez-php/queue`.
+
+---
+
+## Local Development with Mailpit
+
+[Mailpit](https://github.com/axllent/mailpit) is a local SMTP mail catcher with a web UI. All outgoing mail is captured and displayed without being delivered to real recipients.
+
+### 1 — Add Mailpit to docker-compose.yml
+
+```yaml
+services:
+  mailpit:
+    image: axllent/mailpit
+    container_name: my-app-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+```
+
+### 2 — Configure the SMTP driver to point at Mailpit
+
+```dotenv
+MAIL_DRIVER=smtp
+MAIL_HOST=mailpit
+MAIL_PORT=1025
+MAIL_ENCRYPTION=none
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM_ADDRESS=dev@example.com
+MAIL_FROM_NAME="My App (dev)"
+```
+
+### 3 — Open the Mailpit web UI
+
+Navigate to `http://localhost:8025` in your browser. Every message sent via `Mail::send()` appears here instantly.
+
+### 4 — SMTP integration tests
+
+To run the Mailpit smoke tests in `ez-php/mail` itself:
+
+```bash
+MAILPIT_HOST=127.0.0.1 MAILPIT_SMTP_PORT=1025 MAILPIT_API_PORT=8025 \
+  vendor/bin/phpunit --group mailpit
+```
+
+The three Mailpit tests are skipped automatically when `MAILPIT_HOST` is not set.
