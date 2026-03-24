@@ -13,3 +13,16 @@ services:
     working_dir: /var/www/html
     env_file:
       - .env
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: ez-php-mail-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 50
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
