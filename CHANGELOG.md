@@ -6,6 +6,7 @@ All notable changes to `ez-php/mail` are documented here.
 
 ### Documentation
 - Update CHANGELOG for v0.9.3 [skip ci]
+- Update CHANGELOG for v1.0.0 [skip ci]
 
 ## [v0.9.3] — 2026-03-24
 
