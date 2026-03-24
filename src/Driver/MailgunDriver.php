@@ -73,11 +73,7 @@ final class MailgunDriver implements MailerInterface
             throw new MailException('Failed to initialise cURL handle');
         }
 
-        try {
-            $this->execute($ch, $endpoint, $fields);
-        } finally {
-            curl_close($ch);
-        }
+        $this->execute($ch, $endpoint, $fields);
     }
 
     /**
