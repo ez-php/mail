@@ -77,7 +77,7 @@ final class SendGridDriver implements MailerInterface
     private function buildPayload(Mailable $mailable): array
     {
         $fromAddress = $mailable->getFromAddress() !== '' ? $mailable->getFromAddress() : $this->fromAddress;
-        $fromName    = $mailable->getFromName() !== '' ? $mailable->getFromName() : $this->fromName;
+        $fromName = $mailable->getFromName() !== '' ? $mailable->getFromName() : $this->fromName;
 
         $from = ['email' => $fromAddress];
 
@@ -103,9 +103,9 @@ final class SendGridDriver implements MailerInterface
 
         $payload = [
             'personalizations' => [['to' => [$to]]],
-            'from'             => $from,
-            'subject'          => $mailable->getSubject(),
-            'content'          => $content,
+            'from' => $from,
+            'subject' => $mailable->getSubject(),
+            'content' => $content,
         ];
 
         $attachments = $this->buildAttachments($mailable->getAttachments());
@@ -144,9 +144,9 @@ final class SendGridDriver implements MailerInterface
             $mimeType = mime_content_type($attachment->getPath());
 
             $result[] = [
-                'content'     => base64_encode($content),
-                'type'        => is_string($mimeType) ? $mimeType : 'application/octet-stream',
-                'filename'    => $attachment->getName(),
+                'content' => base64_encode($content),
+                'type' => is_string($mimeType) ? $mimeType : 'application/octet-stream',
+                'filename' => $attachment->getName(),
                 'disposition' => 'attachment',
             ];
         }
@@ -169,21 +169,21 @@ final class SendGridDriver implements MailerInterface
         $body = json_encode($payload, JSON_THROW_ON_ERROR);
 
         curl_setopt_array($ch, [
-            CURLOPT_URL            => self::ENDPOINT,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_URL => self::ENDPOINT,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $body,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_HTTPHEADER     => [
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $this->apiKey,
                 'Content-Type: application/json',
                 'Accept: application/json',
             ],
         ]);
 
-        $response   = curl_exec($ch);
+        $response = curl_exec($ch);
         $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError  = curl_error($ch);
+        $curlError = curl_error($ch);
 
         curl_close($ch);
 

@@ -60,11 +60,11 @@ final class MailServiceProvider extends ServiceProvider
             $mime = $app->make(MimeBuilder::class);
 
             return match ($driver) {
-                'smtp'      => $this->makeSmtpDriver($config, $mime),
-                'mailgun'   => $this->makeMailgunDriver($config),
-                'sendgrid'  => $this->makeSendGridDriver($config),
-                'log'       => $this->makeLogDriver($config),
-                default     => new NullDriver(),
+                'smtp' => $this->makeSmtpDriver($config, $mime),
+                'mailgun' => $this->makeMailgunDriver($config),
+                'sendgrid' => $this->makeSendGridDriver($config),
+                'log' => $this->makeLogDriver($config),
+                default => new NullDriver(),
             };
         });
     }
@@ -122,11 +122,11 @@ final class MailServiceProvider extends ServiceProvider
      */
     private function makeMailgunDriver(ConfigInterface $config): MailgunDriver
     {
-        $domain      = $config->get('mail.mailgun_domain');
-        $apiKey      = $config->get('mail.mailgun_secret');
-        $region      = $config->get('mail.mailgun_region');
+        $domain = $config->get('mail.mailgun_domain');
+        $apiKey = $config->get('mail.mailgun_secret');
+        $region = $config->get('mail.mailgun_region');
         $fromAddress = $config->get('mail.from_address');
-        $fromName    = $config->get('mail.from_name');
+        $fromName = $config->get('mail.from_name');
 
         return new MailgunDriver(
             is_string($domain) ? $domain : '',
@@ -146,9 +146,9 @@ final class MailServiceProvider extends ServiceProvider
      */
     private function makeSendGridDriver(ConfigInterface $config): SendGridDriver
     {
-        $apiKey      = $config->get('mail.sendgrid_api_key');
+        $apiKey = $config->get('mail.sendgrid_api_key');
         $fromAddress = $config->get('mail.from_address');
-        $fromName    = $config->get('mail.from_name');
+        $fromName = $config->get('mail.from_name');
 
         return new SendGridDriver(
             is_string($apiKey) ? $apiKey : '',
