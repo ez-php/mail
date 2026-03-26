@@ -8,7 +8,9 @@ use EzPhp\Contracts\ConfigInterface;
 use EzPhp\Contracts\ContainerInterface;
 use EzPhp\Contracts\ServiceProvider;
 use EzPhp\Mail\Driver\LogDriver;
+use EzPhp\Mail\Driver\MailgunDriver;
 use EzPhp\Mail\Driver\NullDriver;
+use EzPhp\Mail\Driver\SendGridDriver;
 use EzPhp\Mail\Driver\SmtpDriver;
 
 /**
@@ -18,9 +20,11 @@ use EzPhp\Mail\Driver\SmtpDriver;
  * the static Mail facade in boot().
  *
  * Supported drivers (config key: mail.driver):
- * - 'smtp' — native SMTP via stream_socket_client()
- * - 'log'  — writes a human-readable summary to a log file
- * - 'null' — silently discards all messages (default)
+ * - 'smtp'     — native SMTP via stream_socket_client()
+ * - 'mailgun'  — Mailgun v3 REST API via cURL
+ * - 'sendgrid' — SendGrid v3 Mail Send API via cURL
+ * - 'log'      — writes a human-readable summary to a log file
+ * - 'null'     — silently discards all messages (default)
  *
  * Config keys:
  * | Key               | Type   | Default         | Meaning                              |
@@ -56,9 +60,11 @@ final class MailServiceProvider extends ServiceProvider
             $mime = $app->make(MimeBuilder::class);
 
             return match ($driver) {
-                'smtp' => $this->makeSmtpDriver($config, $mime),
-                'log' => $this->makeLogDriver($config),
-                default => new NullDriver(),
+                'smtp'      => $this->makeSmtpDriver($config, $mime),
+                'mailgun'   => $this->makeMailgunDriver($config),
+                'sendgrid'  => $this->makeSendGridDriver($config),
+                'log'       => $this->makeLogDriver($config),
+                default     => new NullDriver(),
             };
         });
     }
@@ -105,6 +111,50 @@ final class MailServiceProvider extends ServiceProvider
         $fromName = is_string($fromName) ? $fromName : '';
 
         return new SmtpDriver($host, $port, $username, $password, $encryption, $fromAddress, $fromName, $mime);
+    }
+
+    /**
+     * Build a MailgunDriver from the current config.
+     *
+     * @param ConfigInterface $config
+     *
+     * @return MailgunDriver
+     */
+    private function makeMailgunDriver(ConfigInterface $config): MailgunDriver
+    {
+        $domain      = $config->get('mail.mailgun_domain');
+        $apiKey      = $config->get('mail.mailgun_secret');
+        $region      = $config->get('mail.mailgun_region');
+        $fromAddress = $config->get('mail.from_address');
+        $fromName    = $config->get('mail.from_name');
+
+        return new MailgunDriver(
+            is_string($domain) ? $domain : '',
+            is_string($apiKey) ? $apiKey : '',
+            is_string($fromAddress) ? $fromAddress : '',
+            is_string($fromName) ? $fromName : '',
+            is_string($region) && $region !== '' ? $region : 'us',
+        );
+    }
+
+    /**
+     * Build a SendGridDriver from the current config.
+     *
+     * @param ConfigInterface $config
+     *
+     * @return SendGridDriver
+     */
+    private function makeSendGridDriver(ConfigInterface $config): SendGridDriver
+    {
+        $apiKey      = $config->get('mail.sendgrid_api_key');
+        $fromAddress = $config->get('mail.from_address');
+        $fromName    = $config->get('mail.from_name');
+
+        return new SendGridDriver(
+            is_string($apiKey) ? $apiKey : '',
+            is_string($fromAddress) ? $fromAddress : '',
+            is_string($fromName) ? $fromName : '',
+        );
     }
 
     /**

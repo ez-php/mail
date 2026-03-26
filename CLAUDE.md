@@ -156,7 +156,7 @@ When adding a new module, add `"$ROOT/modules/<name>"` to the `PACKAGES` array i
 
 # Package: ez-php/mail
 
-Transactional mail module for ez-php applications — pluggable drivers (SMTP, Log, Null), a fluent `Mailable` builder, RFC 2822 / MIME message construction, and a `Mail` static facade.
+Transactional mail module for ez-php applications — pluggable drivers (SMTP, Mailgun, SendGrid, Log, Null), a fluent `Mailable` builder, RFC 2822 / MIME message construction, and a `Mail` static facade.
 
 ---
 
@@ -174,6 +174,7 @@ src/
 └── Driver/
     ├── SmtpDriver.php          — native SMTP via stream_socket_client(); no external library
     ├── MailgunDriver.php       — Mailgun v3 REST API via cURL; no third-party SDK; supports US + EU regions
+    ├── SendGridDriver.php      — SendGrid v3 Mail Send API via cURL; bearer token auth; attachments base64-encoded
     ├── LogDriver.php           — writes human-readable summaries to a log file
     └── NullDriver.php          — silently discards all messages
 
@@ -279,6 +280,23 @@ Writes a one-line human-readable summary per message to a file path. The log dir
 
 ---
 
+### SendGridDriver (`src/Driver/SendGridDriver.php`)
+
+Delivers mail via the SendGrid v3 Mail Send API using PHP's built-in cURL extension. No third-party library required.
+
+Endpoint: `https://api.sendgrid.com/v3/mail/send`
+Authentication: `Authorization: Bearer <api_key>` header.
+Request body: JSON with `personalizations`, `from`, `subject`, `content`, and optional `attachments`.
+Attachments are base64-encoded and sent inline in the JSON payload.
+
+Constructor parameters: `$apiKey`, `$fromAddress`, `$fromName`.
+
+This driver is **not covered by automated unit tests** — a live SendGrid account with a verified Sender is required. Integration-test it against a verified Sender identity or use the `LogDriver` during development.
+
+Config keys: `mail.sendgrid_api_key`, `mail.from_address`, `mail.from_name`.
+
+---
+
 ### NullDriver (`src/Driver/NullDriver.php`)
 
 All calls to `send()` are no-ops. Default driver when `mail.driver` is unset or unknown.
@@ -292,6 +310,8 @@ Static facade. Mirrors `Log` from `ez-php/logging`: `setMailer()` / `resetMailer
 ---
 
 ### MailServiceProvider (`src/MailServiceProvider.php`)
+
+Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (default).
 
 **`register()`:**
 - Binds `MimeBuilder` (new instance each resolution)
