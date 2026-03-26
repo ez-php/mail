@@ -173,6 +173,7 @@ src/
 ├── MailServiceProvider.php     — binds MailerInterface (config-driven), wires Mail facade in boot()
 └── Driver/
     ├── SmtpDriver.php          — native SMTP via stream_socket_client(); no external library
+    ├── MailgunDriver.php       — Mailgun v3 REST API via cURL; no third-party SDK; supports US + EU regions
     ├── LogDriver.php           — writes human-readable summaries to a log file
     └── NullDriver.php          — silently discards all messages
 
@@ -252,6 +253,23 @@ Implements the SMTP protocol (RFC 5321) directly using PHP's `stream_socket_clie
 AUTH LOGIN is used when `username` is non-empty. RFC 5321 dot-stuffing is applied to the message body before sending.
 
 This driver is not covered by automated unit tests (a live SMTP server would be required). Integration-test it against a local mail catcher such as Mailpit or MailHog.
+
+---
+
+### MailgunDriver (`src/Driver/MailgunDriver.php`)
+
+Delivers mail via the Mailgun HTTP API (v3) using PHP's built-in cURL extension. No third-party library required.
+
+| Region | API endpoint |
+|--------|-------------|
+| `us` (default) | `https://api.mailgun.net/v3/{domain}/messages` |
+| `eu` | `https://api.eu.mailgun.net/v3/{domain}/messages` |
+
+Authentication uses HTTP Basic auth with `api` as the username and the private API key as the password. Attachments are sent as `multipart/form-data` file fields (`attachment[0]`, `attachment[1]`, …).
+
+Constructor parameters: `$domain`, `$apiKey`, `$fromAddress`, `$fromName`, `$region = 'us'`.
+
+This driver is **not covered by automated unit tests** — a live Mailgun account (or Mailgun Sandbox domain) is required. Integration-test it against a Sandbox domain or use the `LogDriver` during development.
 
 ---
 
