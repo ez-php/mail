@@ -71,12 +71,24 @@ final class MailServiceProvider extends ServiceProvider
 
     /**
      * Wire the static Mail facade to the resolved MailerInterface.
+     * Optionally wire the view renderer when a MailViewInterface binding is available.
      *
      * @return void
      */
     public function boot(): void
     {
         Mail::setMailer($this->app->make(MailerInterface::class));
+
+        // Wire view renderer when MailViewInterface is bound in the container.
+        // The try/catch handles the case where it is not configured — view() calls
+        // on Mailable will then throw MailException at send time with a clear message.
+        try {
+            /** @var MailViewInterface $renderer */
+            $renderer = $this->app->make(MailViewInterface::class);
+            Mailable::setViewRenderer($renderer);
+        } catch (\Throwable) {
+            // MailViewInterface not configured — view() will throw on use
+        }
     }
 
     /**

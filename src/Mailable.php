@@ -24,10 +24,23 @@ namespace EzPhp\Mail;
  *       }
  *   }
  *
+ * Example — view integration (requires MailViewInterface to be bound):
+ *   $mail = (new Mailable())
+ *       ->to('user@example.com')
+ *       ->subject('Welcome!')
+ *       ->view('emails.welcome', ['user' => $user]);
+ *
  * @package EzPhp\Mail
  */
 class Mailable
 {
+    /**
+     * Optional view renderer for template-based HTML bodies.
+     * Set via setViewRenderer() from MailServiceProvider::boot().
+     *
+     * @var MailViewInterface|null
+     */
+    private static ?MailViewInterface $viewRenderer = null;
     /**
      * @var string Recipient e-mail address.
      */
@@ -62,6 +75,16 @@ class Mailable
      * @var string HTML body; optional when a plain-text body is provided.
      */
     private string $htmlBody = '';
+
+    /**
+     * @var string View template name for HTML body rendering (e.g. 'emails.welcome').
+     */
+    private string $viewName = '';
+
+    /**
+     * @var array<string, mixed> Data to pass to the view template.
+     */
+    private array $viewData = [];
 
     /**
      * @var list<Attachment> File attachments.
@@ -126,6 +149,47 @@ class Mailable
     public function text(string $body): static
     {
         $this->textBody = $body;
+
+        return $this;
+    }
+
+    /**
+     * Wire the view renderer used for template-based HTML bodies.
+     * Called by MailServiceProvider::boot() when a MailViewInterface is available.
+     *
+     * @param MailViewInterface $renderer
+     *
+     * @return void
+     */
+    public static function setViewRenderer(MailViewInterface $renderer): void
+    {
+        self::$viewRenderer = $renderer;
+    }
+
+    /**
+     * Clear the view renderer — used in test tearDown to prevent state leaking.
+     *
+     * @return void
+     */
+    public static function resetViewRenderer(): void
+    {
+        self::$viewRenderer = null;
+    }
+
+    /**
+     * Set the HTML body using a view template.
+     * Delegates rendering to the registered MailViewInterface at send time.
+     * Throws MailException if called without a view renderer configured.
+     *
+     * @param string               $name View template name (e.g. 'emails.welcome').
+     * @param array<string, mixed> $data Variables to pass to the template.
+     *
+     * @return static
+     */
+    public function view(string $name, array $data = []): static
+    {
+        $this->viewName = $name;
+        $this->viewData = $data;
 
         return $this;
     }
@@ -223,10 +287,27 @@ class Mailable
     /**
      * Return the HTML body.
      *
+     * When a view template has been set via view(), the renderer is invoked and
+     * the result is returned. Throws MailException when a view name is set but no
+     * MailViewInterface has been configured via setViewRenderer().
+     *
+     * @throws MailException When a view is set but no renderer is configured.
+     *
      * @return string
      */
     public function getHtmlBody(): string
     {
+        if ($this->viewName !== '') {
+            if (self::$viewRenderer === null) {
+                throw new MailException(
+                    'Mailable::view() was called but no view renderer is configured. ' .
+                    'Bind MailViewInterface in a service provider and ensure MailServiceProvider is registered.'
+                );
+            }
+
+            return self::$viewRenderer->render($this->viewName, $this->viewData);
+        }
+
         return $this->htmlBody;
     }
 
