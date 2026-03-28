@@ -185,8 +185,6 @@ final class SendGridDriver implements MailerInterface
         $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
 
-        curl_close($ch);
-
         if ($curlError !== '') {
             throw new MailException("SendGrid delivery failed: {$curlError}");
         }

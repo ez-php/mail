@@ -41,6 +41,7 @@ class Mailable
      * @var MailViewInterface|null
      */
     private static ?MailViewInterface $viewRenderer = null;
+
     /**
      * @var string Recipient e-mail address.
      */
