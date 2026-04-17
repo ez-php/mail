@@ -57,11 +57,13 @@ Mail::send(
 
 ## Drivers
 
-| Driver | `MAIL_DRIVER` | Description |
-|--------|--------------|-------------|
-| SMTP   | `smtp`       | Delivers via a real SMTP server (RFC 5321, pure PHP) |
-| Log    | `log`        | Writes a summary to a log file; safe for dev/CI |
-| Null   | `null`       | Silently discards every message (default) |
+| Driver   | `MAIL_DRIVER` | Description |
+|----------|--------------|-------------|
+| SMTP     | `smtp`       | Delivers via a real SMTP server (RFC 5321, pure PHP) |
+| Mailgun  | `mailgun`    | Mailgun v3 REST API via cURL; no third-party SDK |
+| SendGrid | `sendgrid`   | SendGrid v3 Mail Send API via cURL; no third-party SDK |
+| Log      | `log`        | Writes a summary to a log file; safe for dev/CI |
+| Null     | `null`       | Silently discards every message (default) |
 
 ### SMTP
 
@@ -78,6 +80,30 @@ MAIL_FROM_NAME="My App"
 
 Supports TLS via STARTTLS (port 587), implicit SSL (port 465), and plain-text (port 25).
 Authentication is AUTH LOGIN; omit `MAIL_USERNAME` to skip authentication.
+
+### Mailgun
+
+```dotenv
+MAIL_DRIVER=mailgun
+MAIL_MAILGUN_DOMAIN=mg.example.com
+MAIL_MAILGUN_API_KEY=key-xxxxxxxxxxxxxxxxxxxx
+MAIL_MAILGUN_REGION=us           # us (default) or eu
+MAIL_FROM_ADDRESS=noreply@example.com
+MAIL_FROM_NAME="My App"
+```
+
+Delivers via the Mailgun HTTP API v3. US region uses `api.mailgun.net`; EU region uses `api.eu.mailgun.net`. Attachments are sent as `multipart/form-data`.
+
+### SendGrid
+
+```dotenv
+MAIL_DRIVER=sendgrid
+MAIL_SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxx
+MAIL_FROM_ADDRESS=noreply@example.com
+MAIL_FROM_NAME="My App"
+```
+
+Delivers via the SendGrid v3 Mail Send API. Attachments are base64-encoded and sent inline in the JSON payload.
 
 ### Log
 
