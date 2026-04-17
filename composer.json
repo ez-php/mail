@@ -1,6 +1,6 @@
 {
     "name": "ez-php/mail",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "description": "Transactional mail module for the ez-php framework \u2014 SMTP, log, and null drivers",
     "type": "library",
     "license": "MIT",
