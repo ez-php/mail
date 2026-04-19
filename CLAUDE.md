@@ -165,6 +165,7 @@ Transactional mail module for ez-php applications — pluggable drivers (SMTP, M
 ```
 src/
 ├── MailerInterface.php         — contract: send(Mailable): void
+├── MailViewInterface.php       — adapter contract for rendering view templates into HTML bodies; optional ez-php/view integration
 ├── MailException.php           — base exception for all mail errors
 ├── Mailable.php                — fluent builder: to(), from(), subject(), text(), html(), attach()
 ├── Attachment.php              — immutable value object: file path + display name
