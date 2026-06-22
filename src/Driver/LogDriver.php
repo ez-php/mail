@@ -61,7 +61,7 @@ final class LogDriver implements MailerInterface
 
         $dir = dirname($this->logPath);
 
-        if ($dir !== '' && $dir !== '.' && !is_dir($dir)) {
+        if ($dir !== '.' && !is_dir($dir)) {
             mkdir($dir, 0o755, true);
         }
 
