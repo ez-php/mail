@@ -148,11 +148,12 @@ final class SmtpDriver implements MailerInterface
         }
 
         $fromAddress = $mailable->getFromAddress() !== '' ? $mailable->getFromAddress() : $this->fromAddress;
+        $toAddress = $mailable->getToAddress();
 
-        $this->write($socket, "MAIL FROM:<{$fromAddress}>\r\n");
+        $this->write($socket, 'MAIL FROM:<' . $this->assertSafeAddress($fromAddress) . ">\r\n");
         $this->expect($socket, 250);
 
-        $this->write($socket, "RCPT TO:<{$mailable->getToAddress()}>\r\n");
+        $this->write($socket, 'RCPT TO:<' . $this->assertSafeAddress($toAddress) . ">\r\n");
         $this->expect($socket, 250);
 
         $this->write($socket, "DATA\r\n");
@@ -166,6 +167,27 @@ final class SmtpDriver implements MailerInterface
         $this->expect($socket, 250);
 
         $this->write($socket, "QUIT\r\n");
+    }
+
+    /**
+     * Guard against SMTP command injection: reject any address containing a
+     * control character (notably CR/LF) before it is interpolated into a
+     * MAIL FROM / RCPT TO command line, since an embedded newline would let
+     * the value inject additional SMTP commands.
+     *
+     * @param string $address Address to validate.
+     *
+     * @throws MailException When the address contains a control character.
+     *
+     * @return string The unmodified address, once validated.
+     */
+    private function assertSafeAddress(string $address): string
+    {
+        if (preg_match('/[\x00-\x1F\x7F]/', $address) === 1) {
+            throw new MailException('Refusing to send: address contains a control character');
+        }
+
+        return $address;
     }
 
     /**

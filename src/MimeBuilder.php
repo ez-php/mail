@@ -159,6 +159,8 @@ final class MimeBuilder
      */
     private function formatAddress(string $header, string $address, string $name): string
     {
+        $address = $this->stripHeaderInjection($address);
+
         if ($name !== '') {
             return "{$header}: " . $this->encodeHeader($name) . " <{$address}>\r\n";
         }
@@ -169,17 +171,37 @@ final class MimeBuilder
     /**
      * RFC 2047 encode a header value when it contains non-ASCII characters.
      *
+     * Also strips CR/LF and other control characters first, so a value that
+     * originated from user input cannot inject additional headers or
+     * recipients into the outgoing message (header injection).
+     *
      * @param string $value Raw header value.
      *
      * @return string
      */
     private function encodeHeader(string $value): string
     {
+        $value = $this->stripHeaderInjection($value);
+
         if (preg_match('/^[\x00-\x7F]*$/', $value) === 1) {
             return $value;
         }
 
         return '=?UTF-8?B?' . base64_encode($value) . '?=';
+    }
+
+    /**
+     * Remove CR, LF, and other C0 control characters from a value that will
+     * be interpolated into a MIME header line, preventing header/recipient
+     * injection via embedded newlines.
+     *
+     * @param string $value Raw value.
+     *
+     * @return string Value with control characters removed.
+     */
+    private function stripHeaderInjection(string $value): string
+    {
+        return preg_replace('/[\x00-\x1F\x7F]/', '', $value) ?? '';
     }
 
     /**

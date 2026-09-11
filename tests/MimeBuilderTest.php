@@ -203,4 +203,50 @@ final class MimeBuilderTest extends TestCase
 
         $this->assertMatchesRegularExpression('/Date: \w{3}, \d{2} \w{3} \d{4}/', $message);
     }
+
+    public function testToAddressCannotInjectAdditionalHeaders(): void
+    {
+        $mailable = (new Mailable())
+            ->to("victim@example.com\r\nBcc: attacker@evil.com", '')
+            ->subject('Hi')
+            ->text('body');
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        // The embedded CRLF must be stripped so "Bcc: attacker@evil.com"
+        // cannot start a new header line — it is harmless leftover text
+        // appended to the To: value, not a second header.
+        $this->assertStringNotContainsString("\r\nBcc:", $message);
+        $this->assertSame(1, substr_count($message, "\r\n\r\n"), 'exactly one header/body separator');
+    }
+
+    public function testFromNameCannotInjectAdditionalHeaders(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject('Hi')
+            ->text('body');
+
+        $message = $this->builder->build(
+            $mailable,
+            'from@example.com',
+            "Sender\r\nBcc: attacker@evil.com"
+        );
+
+        $this->assertStringNotContainsString("\r\nBcc:", $message);
+        $this->assertSame(1, substr_count($message, "\r\n\r\n"), 'exactly one header/body separator');
+    }
+
+    public function testSubjectCannotInjectAdditionalHeaders(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject("Hi\r\nBcc: attacker@evil.com")
+            ->text('body');
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        $this->assertStringNotContainsString("\r\nBcc:", $message);
+        $this->assertSame(1, substr_count($message, "\r\n\r\n"), 'exactly one header/body separator');
+    }
 }

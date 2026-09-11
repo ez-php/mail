@@ -74,6 +74,75 @@ final class SmtpDriverTest extends TestCase
         $driver->send((new Mailable())->to('to@example.com')->subject('Hi')->text('body'));
     }
 
+    #[Group('mailpit')]
+    public function testToAddressWithControlCharacterIsRejected(): void
+    {
+        $config = $this->mailpitConfig();
+
+        if ($this->mailpitHost() === null) {
+            $this->markTestSkipped('MAILPIT_HOST not set — start Mailpit and set MAILPIT_HOST to run this test');
+        }
+
+        $this->purgeMailpit($config['host'], $config['apiPort']);
+
+        $driver = new SmtpDriver(
+            host: $config['host'],
+            port: $config['smtpPort'],
+            username: '',
+            password: '',
+            encryption: 'none',
+            fromAddress: 'sender@example.com',
+            fromName: '',
+            mime: new MimeBuilder(),
+        );
+
+        // A CRLF in the recipient address would, without the guard, inject an
+        // extra SMTP command (SMTP command injection) instead of being
+        // rejected outright.
+        $mailable = (new Mailable())
+            ->to("victim@example.com\r\nRCPT TO:<attacker@evil.com>", '')
+            ->subject('Injection attempt')
+            ->text('body');
+
+        $this->expectException(MailException::class);
+        $this->expectExceptionMessage('Refusing to send: address contains a control character');
+
+        $driver->send($mailable);
+    }
+
+    #[Group('mailpit')]
+    public function testFromAddressWithControlCharacterIsRejected(): void
+    {
+        $config = $this->mailpitConfig();
+
+        if ($this->mailpitHost() === null) {
+            $this->markTestSkipped('MAILPIT_HOST not set — start Mailpit and set MAILPIT_HOST to run this test');
+        }
+
+        $this->purgeMailpit($config['host'], $config['apiPort']);
+
+        $driver = new SmtpDriver(
+            host: $config['host'],
+            port: $config['smtpPort'],
+            username: '',
+            password: '',
+            encryption: 'none',
+            fromAddress: "sender@example.com\r\nRCPT TO:<attacker@evil.com>",
+            fromName: '',
+            mime: new MimeBuilder(),
+        );
+
+        $mailable = (new Mailable())
+            ->to('victim@example.com')
+            ->subject('Injection attempt')
+            ->text('body');
+
+        $this->expectException(MailException::class);
+        $this->expectExceptionMessage('Refusing to send: address contains a control character');
+
+        $driver->send($mailable);
+    }
+
     // ── Mailpit integration tests ──────────────────────────────────────────────
 
     /**
