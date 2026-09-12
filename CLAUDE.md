@@ -129,6 +129,14 @@ vendor/bin/docker-init
 
 This copies `Dockerfile`, `docker-compose.yml`, `.env.example`, `start.sh`, and `docker/` into the module, replacing `{{MODULE_NAME}}` placeholders. Existing files are never overwritten.
 
+Pass `--services` to merge MySQL/Redis service definitions directly into `docker-compose.yml` and uncomment the matching sections in `.env.example`, instead of adapting them by hand afterward:
+
+```
+vendor/bin/docker-init --services=mysql
+vendor/bin/docker-init --services=redis
+vendor/bin/docker-init --services=mysql,redis
+```
+
 After scaffolding:
 
 1. Adapt `docker-compose.yml` — add or remove services (MySQL, Redis) as needed
@@ -190,7 +198,10 @@ tests/
 ├── MailTest.php                — covers Mail facade: delegation, uninitialized throw, reset, replacement
 └── Driver/
     ├── NullDriverTest.php      — covers NullDriver: no exception, no output
-    └── LogDriverTest.php       — covers LogDriver: file write, append, directory creation, field format
+    ├── LogDriverTest.php       — covers LogDriver: file write, append, directory creation, field format
+    ├── MailgunDriverTest.php   — covers buildFields() via Reflection: from/to/subject/text/html, attachments, unreadable-file error
+    ├── SendGridDriverTest.php  — covers buildPayload() via Reflection: from/to/subject/content, attachments, unreadable-file error
+    └── SmtpDriverTest.php      — covers connection-failure exceptions (unit) + full delivery (Mailpit integration, group "mailpit")
 ```
 
 ---
@@ -274,7 +285,7 @@ Authentication uses HTTP Basic auth with `api` as the username and the private A
 
 Constructor parameters: `$domain`, `$apiKey`, `$fromAddress`, `$fromName`, `$region = 'us'`.
 
-This driver is **not covered by automated unit tests** — a live Mailgun account (or Mailgun Sandbox domain) is required. Integration-test it against a Sandbox domain or use the `LogDriver` during development.
+Like `SendGridDriver`, `send()` itself talks directly to `curl_*` functions (no `TransportInterface` seam), so it cannot be unit-tested without a live account — but the private `buildFields()` method that constructs the multipart form fields is pure (aside from reading attachment files) and is unit-tested via Reflection in `MailgunDriverTest`, covering exactly the "malformed payload" risk that matters most. Integration-test full delivery against a Sandbox domain or use the `LogDriver` during development.
 
 ---
 
@@ -295,7 +306,7 @@ Attachments are base64-encoded and sent inline in the JSON payload.
 
 Constructor parameters: `$apiKey`, `$fromAddress`, `$fromName`.
 
-This driver is **not covered by automated unit tests** — a live SendGrid account with a verified Sender is required. Integration-test it against a verified Sender identity or use the `LogDriver` during development.
+Like `MailgunDriver`, `send()` itself talks directly to `curl_*` functions (no `TransportInterface` seam), so it cannot be unit-tested without a live account — but the private `buildPayload()`/`buildAttachments()` methods that construct the JSON body are pure (aside from reading attachment files) and are unit-tested via Reflection in `SendGridDriverTest`, covering exactly the "malformed payload" risk that matters most. Integration-test full delivery against a verified Sender identity or use the `LogDriver` during development.
 
 Config keys: `mail.sendgrid_api_key`, `mail.from_address`, `mail.from_name`.
 
@@ -343,6 +354,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 ## Testing Approach
 
 - **No external infrastructure** — All tests run in-process. `LogDriverTest` writes to a temp file (created inline, deleted in `tearDown`).
+- **`MailgunDriverTest`/`SendGridDriverTest` use Reflection on the private payload-builder method** — `buildFields()`/`buildPayload()` are the only pure (I/O-free apart from reading local attachment files) parts of these drivers; `send()` itself calls `curl_*` directly with no seam to fake, so it cannot be unit-tested. `new \ReflectionMethod($driver, 'buildFields')->invoke($driver, $mailable)` exercises exactly the payload-construction logic that would otherwise only be caught against a live account.
 - **`SmtpDriver` not unit-tested** — Requires a live SMTP server. Use a local mail catcher (Mailpit, MailHog) for integration testing.
 - **`SpyMailer` named class** — `MailTest` uses a file-scope named class `SpyMailer implements MailerInterface` with a `getSent()` getter. Anonymous classes with reference-backed private properties confuse PHPStan's `property.onlyWritten` check.
 - **`Mail::resetMailer()` in setUp/tearDown** — Required in any test touching the `Mail` facade to prevent state leaking between test classes.
