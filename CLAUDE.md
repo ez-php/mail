@@ -54,7 +54,7 @@ composer test-classes:check  # duplicate test class names only
 - One responsibility per class — keep classes small and focused
 - Constructor injection — no service locator pattern
 - No global state unless intentional and documented
-- Concrete classes are `final` — extend behavior through composition, not inheritance. Exception-hierarchy base classes (e.g. `EzPhpException`, `HttpException`, `CacheException`) are the one carve-out, since they exist specifically to be extended.
+- Concrete classes are `final` — extend behavior through composition, not inheritance. Exception-hierarchy base classes (e.g. `EzPhpException`, `HttpException`, `CacheException`) are one carve-out, since they exist specifically to be extended. A documented template-method-style base class (e.g. `Mailable`, meant to be configured via constructor-time subclassing) is the other — the owning module's `CLAUDE.md` must record it under Design Decisions.
 
 **Naming:**
 
@@ -394,6 +394,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 - **`SmtpDriver` uses `stream_socket_client()` instead of `fsockopen()`** — `stream_socket_client()` supports SSL wrapping natively (the `ssl://` scheme) and is PHP-stream-compatible (`fgets`, `fwrite`, `fclose`), which keeps all I/O uniform.
 - **`MimeBuilder` is a separate class** — Isolating MIME construction from the transport allows `LogDriver` to format output without building MIME, and allows `MimeBuilder` to be tested without a network connection.
 - **`Mailable` is non-abstract and mutable** — Mutable fluent builder is the natural fit for mail composition and matches the usage pattern across the ecosystem. Immutability (clone-based withers) would complicate subclassing without meaningful benefit for this domain.
+- **`Mailable` is the project's template-method-style `final` carve-out** (see root `CLAUDE.md` Coding Standards) — it is deliberately left non-`final` because application-specific mail classes are meant to extend it and configure themselves in their constructor (see the "extended" example in `Mailable`'s class docblock, e.g. `WelcomeMail extends Mailable`). This is the same category as the exception-hierarchy carve-out, just for a builder instead of an exception base class.
 - **`LogDriver` does not use `MimeBuilder`** — Dev/CI logging wants human-readable field summaries, not full MIME output. Keeping them decoupled avoids encoding overhead in development.
 - **`NullDriver` as the default** — Fail-open is correct for mail: missing config should cause messages to be silently dropped rather than throwing at boot time. Developers opt into real delivery explicitly.
 - **`Mail::send()` throws when uninitialised** — Fail-fast at runtime is preferable to silent discards. A missing `MailServiceProvider` registration becomes immediately visible in development.
