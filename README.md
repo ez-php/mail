@@ -203,25 +203,13 @@ Mail::resetMailer();
 
 ## Queue Integration
 
-Mail delivery is synchronous by default — `Mail::send()` blocks until the driver finishes. To dispatch mail asynchronously, wrap the call in a queue job:
+Mail delivery is synchronous by default — `Mail::send()` blocks until the driver finishes. To dispatch mail asynchronously, push a `Job\SendMailableJob` (requires `ez-php/queue` to be installed — it's a soft dependency, declared only in `require-dev` here):
 
 ```php
-use EzPhp\Contracts\JobInterface;
-use EzPhp\Mail\Mail;
+use EzPhp\Mail\Job\SendMailableJob;
 use EzPhp\Mail\Mailable;
 
-final class SendMailJob implements JobInterface
-{
-    public function __construct(private readonly Mailable $mailable) {}
-
-    public function handle(): void
-    {
-        Mail::send($this->mailable);
-    }
-}
-
-// Dispatch from a controller or service
-$queue->push(new SendMailJob(
+$queue->push(new SendMailableJob(
     (new Mailable())
         ->to($user->email, $user->name)
         ->subject('Welcome!')
@@ -231,7 +219,7 @@ $queue->push(new SendMailJob(
 
 The `Mailable` is serialized with the job. `Mail::send()` inside `handle()` uses whatever driver is registered in the worker process — typically `SmtpDriver` in production and `NullDriver` or `LogDriver` in development.
 
-> **Note:** Queue-backed delivery is an application-layer concern. The `ez-php/mail` package has no dependency on `ez-php/queue`.
+Need something beyond "deliver this one Mailable" — custom retry policy, batching, etc.? Write your own `Job` subclass instead, following the same one-line `handle()` pattern.
 
 ---
 

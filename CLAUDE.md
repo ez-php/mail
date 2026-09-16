@@ -262,6 +262,8 @@ src/
 ├── MimeBuilder.php             — RFC 2822 / MIME message encoder (text, html, multipart, attachments)
 ├── Mail.php                    — static facade; delegates to injected MailerInterface singleton
 ├── MailServiceProvider.php     — binds MailerInterface (config-driven), wires Mail facade in boot()
+├── Job/
+│   └── SendMailableJob.php     — ez-php/queue Job wrapper delivering a pre-built Mailable via Mail::send() (soft dependency — require-dev only)
 └── Driver/
     ├── SmtpDriver.php          — native SMTP via stream_socket_client(); no external library
     ├── MailgunDriver.php       — Mailgun v3 REST API via cURL; no third-party SDK; supports US + EU regions
@@ -275,6 +277,8 @@ tests/
 ├── MailableTest.php            — covers Mailable: all setters, getters, attach accumulation, chaining
 ├── MimeBuilderTest.php         — covers MimeBuilder: text, HTML, multipart/alternative, multipart/mixed, encoding
 ├── MailTest.php                — covers Mail facade: delegation, uninitialized throw, reset, replacement
+├── Job/
+│   └── SendMailableJobTest.php — covers handle() delegation to Mail::send(), default queue/maxTries via a spy MailerInterface
 └── Driver/
     ├── NullDriverTest.php      — covers NullDriver: no exception, no output
     ├── LogDriverTest.php       — covers LogDriver: file write, append, directory creation, field format
@@ -416,6 +420,12 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 
 ---
 
+### SendMailableJob (`src/Job/SendMailableJob.php`)
+
+`ez-php/queue` `Job` subclass wrapping a pre-built `Mailable`; `handle()` calls `Mail::send($this->mailable)`. Mirrors `ez-php/notification`'s `SendMailNotificationJob` one layer down — applications that want queued mail delivery *without* going through the notification module push `new SendMailableJob($mailable)` onto their queue directly instead of hand-rolling the same three-line wrapper. Not auto-registered anywhere; the application constructs and pushes it explicitly.
+
+---
+
 ## Design Decisions and Constraints
 
 - **No third-party library** — SMTP is implemented with `stream_socket_client()` and raw protocol strings. This keeps the dependency tree minimal and the code transparent.
@@ -428,6 +438,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 - **`Mail::send()` throws when uninitialised** — Fail-fast at runtime is preferable to silent discards. A missing `MailServiceProvider` registration becomes immediately visible in development.
 - **No `Mail::to()` factory method** — Keeping `Mailable` construction out of the facade makes the entry point unambiguous: `new Mailable()` or a subclass. The facade's only responsibility is delegation.
 - **`is_readable()` before `file_get_contents()`** — Avoids the PHP `E_WARNING` emitted when `file_get_contents()` fails on a missing or unreadable file. The explicit `is_readable()` check throws a typed `MailException` without triggering engine-level warnings.
+- **`ez-php/queue` is a soft dependency, `require-dev` only.** `Job\SendMailableJob` extends `EzPhp\Queue\Job`, but `composer.json`'s `require` block stays limited to `ez-php/contracts` — a module that pulls in `ez-php/queue` as a hard dependency would force it on every application that installs `ez-php/mail`, even ones with no queue. PSR-4 autoloading only resolves `SendMailableJob.php` (and therefore `EzPhp\Queue\Job`) when something actually references the class, so the file can ship in `src/` without breaking `ez-php/mail`'s standalone use. Applications that want it must have `ez-php/queue` installed themselves.
 
 ---
 
@@ -448,7 +459,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 | Concern | Where it belongs |
 |---------|-----------------|
 | Template rendering (Blade, Twig, PHP views) | `ez-php/view` module |
-| Queue-backed async delivery | Application layer: push a job that calls `Mail::send()` |
+| Queue-backed async delivery beyond `Job\SendMailableJob` | Application layer builds richer queued-mail flows (retry policy tuning, batching, etc.) on top of the provided wrapper |
 | Bounce / delivery receipt handling | Application layer or a dedicated webhook handler |
 | Email validation rules | `ez-php/validation` (`email` rule) |
 | Bulk / newsletter sending | Application layer or a dedicated SDK |
