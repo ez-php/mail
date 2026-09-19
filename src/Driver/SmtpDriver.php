@@ -87,16 +87,22 @@ final class SmtpDriver implements MailerInterface
         $errorCode = 0;
         $errorMessage = '';
 
-        $socket = @stream_socket_client(
-            $address,
-            $errorCode,
-            $errorMessage,
-            (float) $this->timeout,
+        [$socket, $warning] = $this->callCapturingWarning(
+            function () use ($address, &$errorCode, &$errorMessage) {
+                return stream_socket_client(
+                    $address,
+                    $errorCode,
+                    $errorMessage,
+                    (float) $this->timeout,
+                );
+            }
         );
 
         if ($socket === false) {
+            $reason = $errorMessage !== '' ? $errorMessage : ($warning ?? 'unknown error');
+
             throw new MailException(
-                "Cannot connect to SMTP server {$this->host}:{$this->port}: {$errorMessage}"
+                "Cannot connect to SMTP server {$this->host}:{$this->port}: {$reason}"
             );
         }
 
@@ -261,5 +267,34 @@ final class SmtpDriver implements MailerInterface
         if (fwrite($socket, $data) === false) {
             throw new MailException('Failed to write to SMTP connection');
         }
+    }
+
+    /**
+     * Run a stream/filesystem call with PHP warnings converted into a returned message
+     * instead of being emitted (replaces the `@` operator, which hides the reason).
+     *
+     * @template T
+     *
+     * @param callable(): T $fn
+     *
+     * @return array{0: T, 1: string|null} The call's result and the captured warning message, if any.
+     */
+    private function callCapturingWarning(callable $fn): array
+    {
+        $warning = null;
+
+        set_error_handler(static function (int $errno, string $errstr) use (&$warning): bool {
+            $warning = $errstr;
+
+            return true;
+        }, E_WARNING);
+
+        try {
+            $result = $fn();
+        } finally {
+            restore_error_handler();
+        }
+
+        return [$result, $warning];
     }
 }
