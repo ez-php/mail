@@ -26,15 +26,15 @@ Add config values to `config/mail.php`:
 
 ```php
 return [
-    'driver'       => env('MAIL_DRIVER', 'null'),
-    'host'         => env('MAIL_HOST', '127.0.0.1'),
-    'port'         => (int) env('MAIL_PORT', 587),
-    'username'     => env('MAIL_USERNAME', ''),
-    'password'     => env('MAIL_PASSWORD', ''),
-    'encryption'   => env('MAIL_ENCRYPTION', 'tls'),
-    'from_address' => env('MAIL_FROM_ADDRESS', ''),
-    'from_name'    => env('MAIL_FROM_NAME', ''),
-    'log_path'     => env('MAIL_LOG_PATH', ''),
+    'driver'       => getenv('MAIL_DRIVER') ?: 'null',
+    'host'         => getenv('MAIL_HOST') ?: '127.0.0.1',
+    'port'         => (int) (getenv('MAIL_PORT') ?: 587),
+    'username'     => getenv('MAIL_USERNAME') ?: '',
+    'password'     => getenv('MAIL_PASSWORD') ?: '',
+    'encryption'   => getenv('MAIL_ENCRYPTION') ?: 'tls',
+    'from_address' => getenv('MAIL_FROM_ADDRESS') ?: '',
+    'from_name'    => getenv('MAIL_FROM_NAME') ?: '',
+    'log_path'     => getenv('MAIL_LOG_PATH') ?: '',
 ];
 ```
 

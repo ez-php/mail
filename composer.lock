@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "695615b409557e998b274730f16a9abe",
+    "content-hash": "ee105e22f35dbfd3b875c3b7968b2913",
     "packages": [
         {
             "name": "ez-php/contracts",
