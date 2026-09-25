@@ -8,6 +8,7 @@ use EzPhp\Mail\Job\SendMailableJob;
 use EzPhp\Mail\Mail;
 use EzPhp\Mail\Mailable;
 use EzPhp\Mail\MailerInterface;
+use EzPhp\Queue\Driver\InMemoryDriver;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Tests\TestCase;
@@ -61,5 +62,18 @@ final class SendMailableJobTest extends TestCase
 
         $this->assertSame('default', $job->getQueue());
         $this->assertSame(3, $job->getMaxTries());
+    }
+
+    public function testJobSurvivesAQueueRoundTripAndStillSends(): void
+    {
+        $queue = new InMemoryDriver();
+        $queue->push(new SendMailableJob((new Mailable())->to('user@example.com')->subject('Queued')->text('Hi')));
+
+        $job = $queue->pop();
+        $this->assertInstanceOf(SendMailableJob::class, $job);
+        $job->handle();
+
+        $this->assertCount(1, $this->mailer->sent);
+        $this->assertSame('Queued', $this->mailer->sent[0]->getSubject());
     }
 }

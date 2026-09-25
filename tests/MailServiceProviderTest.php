@@ -10,6 +10,7 @@ use EzPhp\Mail\Mail;
 use EzPhp\Mail\MailerInterface;
 use EzPhp\Mail\MailServiceProvider;
 use EzPhp\Mail\MimeBuilder;
+use EzPhp\Testing\ApplicationTestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
 
@@ -23,7 +24,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[UsesClass(Mail::class)]
 #[UsesClass(MimeBuilder::class)]
 #[UsesClass(NullDriver::class)]
-final class MailServiceProviderTest extends TestCase
+final class MailServiceProviderTest extends ApplicationTestCase
 {
     /**
      * @param Application $app
