@@ -28,6 +28,7 @@
         "ez-php/contracts": "^2.0"
     },
     "suggest": {
+        "ext-curl": "Needed for Driver\\MailgunDriver and Driver\\SendGridDriver (HTTP API delivery)",
         "ez-php/queue": "Needed for Job\\SendMailableJob (queued mail delivery)"
     },
     "require-dev": {
