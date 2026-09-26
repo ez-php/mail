@@ -122,7 +122,7 @@ final class MailServiceProvider extends ServiceProvider
         $fromName = $config->get('mail.from_name');
         $fromName = is_string($fromName) ? $fromName : '';
 
-        return new SmtpDriver($host, $port, $username, $password, $encryption, $fromAddress, $fromName, $mime);
+        return new SmtpDriver($host, $port, $username, $password, $encryption, $fromAddress, $fromName, $mime, $this->timeout($config));
     }
 
     /**
@@ -146,6 +146,7 @@ final class MailServiceProvider extends ServiceProvider
             is_string($fromAddress) ? $fromAddress : '',
             is_string($fromName) ? $fromName : '',
             is_string($region) && $region !== '' ? $region : 'us',
+            $this->timeout($config),
         );
     }
 
@@ -166,7 +167,22 @@ final class MailServiceProvider extends ServiceProvider
             is_string($apiKey) ? $apiKey : '',
             is_string($fromAddress) ? $fromAddress : '',
             is_string($fromName) ? $fromName : '',
+            $this->timeout($config),
         );
+    }
+
+    /**
+     * Network timeout in seconds for the SMTP, Mailgun and SendGrid drivers (`mail.timeout`).
+     *
+     * @param ConfigInterface $config
+     *
+     * @return int Positive seconds; 30 when unset or invalid.
+     */
+    private function timeout(ConfigInterface $config): int
+    {
+        $timeout = $config->get('mail.timeout');
+
+        return is_int($timeout) && $timeout > 0 ? $timeout : 30;
     }
 
     /**

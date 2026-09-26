@@ -40,6 +40,8 @@ final class MailgunDriver implements MailerInterface
      * @param string $fromAddress Default sender address (overridden by Mailable::from()).
      * @param string $fromName    Default sender display name (overridden by Mailable::from()).
      * @param string $region      API region: 'us' (default) or 'eu'.
+     * @param int    $timeout     Total request timeout in seconds (`mail.timeout`).
+     * @param int    $connectTimeout Connection-phase timeout in seconds, so an unreachable API fails fast.
      */
     public function __construct(
         private readonly string $domain,
@@ -47,6 +49,8 @@ final class MailgunDriver implements MailerInterface
         private readonly string $fromAddress,
         private readonly string $fromName,
         private readonly string $region = 'us',
+        private readonly int $timeout = 30,
+        private readonly int $connectTimeout = 10,
     ) {
     }
 
@@ -127,6 +131,16 @@ final class MailgunDriver implements MailerInterface
     }
 
     /**
+     * Total and connect timeouts for the API request.
+     *
+     * @return array<int, int>
+     */
+    private function timeoutOptions(): array
+    {
+        return [CURLOPT_TIMEOUT => $this->timeout, CURLOPT_CONNECTTIMEOUT => $this->connectTimeout];
+    }
+
+    /**
      * Configure the cURL handle and execute the Mailgun API request.
      *
      * @param CurlHandle                     $ch       Initialised cURL handle.
@@ -145,8 +159,7 @@ final class MailgunDriver implements MailerInterface
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $fields,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-        ]);
+        ] + $this->timeoutOptions());
 
         $response = curl_exec($ch);
         $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);

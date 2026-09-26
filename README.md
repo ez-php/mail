@@ -35,6 +35,7 @@ return [
     'from_address' => getenv('MAIL_FROM_ADDRESS') ?: '',
     'from_name'    => getenv('MAIL_FROM_NAME') ?: '',
     'log_path'     => getenv('MAIL_LOG_PATH') ?: '',
+    'timeout'      => (int) (getenv('MAIL_TIMEOUT') ?: 30), // smtp, mailgun, sendgrid
 ];
 ```
 
