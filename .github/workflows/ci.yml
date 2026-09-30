@@ -14,6 +14,23 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Mailpit for the SMTP integration tests in tests/Driver/SmtpDriverTest.php,
+    # which are skipped when MAILPIT_HOST is unset.
+    services:
+      mailpit:
+        image: axllent/mailpit
+        env:
+          MP_SMTP_AUTH_ACCEPT_ANY: 1
+          MP_SMTP_AUTH_ALLOW_INSECURE: 1
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      MAILPIT_HOST: 127.0.0.1
+      MAILPIT_SMTP_PORT: 1025
+      MAILPIT_API_PORT: 8025
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -74,8 +91,8 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Compatibility matrix: PHP 8.5 (stable) + 8.6 / nightly (experimental)
-  # Runs on the GitHub Actions host — no Docker needed since mail has zero
-  # external service dependencies (SmtpDriver is not tested in unit tests).
+  # Runs on the GitHub Actions host without Mailpit — the SMTP integration tests
+  # skip themselves here and run in the "test" job above.
   # ─────────────────────────────────────────────────────────────────────────────
   compatibility:
     runs-on: ubuntu-latest

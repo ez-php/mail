@@ -369,7 +369,7 @@ Implements the SMTP protocol (RFC 5321) directly using PHP's `stream_socket_clie
 
 AUTH LOGIN is used when `username` is non-empty. RFC 5321 dot-stuffing is applied to the message body before sending.
 
-This driver is not covered by automated unit tests (a live SMTP server would be required). Integration-test it against a local mail catcher such as Mailpit or MailHog.
+Delivery is covered by the Mailpit integration tests in `tests/Driver/SmtpDriverTest.php`: they run when `MAILPIT_HOST` is set — in the CI `test` job (Mailpit service container) and locally via this module's `docker-compose.yml` — and skip themselves otherwise.
 
 ---
 
@@ -464,7 +464,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 
 - **No external infrastructure** — All tests run in-process. `LogDriverTest` writes to a temp file (created inline, deleted in `tearDown`).
 - **`MailgunDriverTest`/`SendGridDriverTest` use Reflection on the private payload-builder method** — `buildFields()`/`buildPayload()` are the only pure (I/O-free apart from reading local attachment files) parts of these drivers; `send()` itself calls `curl_*` directly with no seam to fake, so it cannot be unit-tested. `new \ReflectionMethod($driver, 'buildFields')->invoke($driver, $mailable)` exercises exactly the payload-construction logic that would otherwise only be caught against a live account.
-- **`SmtpDriver` not unit-tested** — Requires a live SMTP server. Use a local mail catcher (Mailpit, MailHog) for integration testing.
+- **`SmtpDriver` is integration-tested, not unit-tested** — delivery needs a live SMTP server, so `SmtpDriverTest` runs against Mailpit when `MAILPIT_HOST` is set (CI `test` job, local Docker) and skips otherwise; the compatibility matrix runs without Mailpit.
 - **`SpyMailer` named class** — `MailTest` uses a file-scope named class `SpyMailer implements MailerInterface` with a `getSent()` getter. Anonymous classes with reference-backed private properties confuse PHPStan's `property.onlyWritten` check.
 - **`Mail::resetMailer()` in setUp/tearDown** — Required in any test touching the `Mail` facade to prevent state leaking between test classes.
 - **`addToAssertionCount(1)` instead of `assertTrue(true)`** — PHPStan flags `assertTrue(true)` as always-true. `addToAssertionCount(1)` satisfies the "at least one assertion" requirement without a PHPStan error.
