@@ -934,16 +934,16 @@
         },
         {
             "name": "ez-php/queue",
-            "version": "2.5.4",
+            "version": "2.5.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/ez-php/queue.git",
-                "reference": "5cd0491bf2dccee4d2d7de58b2a50487414c9e7a"
+                "reference": "653fb64fa28e274c0a27a5def49f9751f7f425eb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ez-php/queue/zipball/5cd0491bf2dccee4d2d7de58b2a50487414c9e7a",
-                "reference": "5cd0491bf2dccee4d2d7de58b2a50487414c9e7a",
+                "url": "https://api.github.com/repos/ez-php/queue/zipball/653fb64fa28e274c0a27a5def49f9751f7f425eb",
+                "reference": "653fb64fa28e274c0a27a5def49f9751f7f425eb",
                 "shasum": ""
             },
             "require": {
@@ -1001,7 +1001,7 @@
                 "issues": "https://github.com/ez-php/queue/issues",
                 "source": "https://github.com/ez-php/queue"
             },
-            "time": "2026-09-26T02:22:21+00:00"
+            "time": "2026-09-30T16:38:55+00:00"
         },
         {
             "name": "ez-php/support",
@@ -1135,16 +1135,16 @@
         },
         {
             "name": "ez-php/testing-application",
-            "version": "2.5.4",
+            "version": "2.5.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/ez-php/testing-application.git",
-                "reference": "ff16e8bf1352469b475e5e1c5d2318801fc5fe01"
+                "reference": "7270b2a85a55f84a0d99be3074263ee020c15b19"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ez-php/testing-application/zipball/ff16e8bf1352469b475e5e1c5d2318801fc5fe01",
-                "reference": "ff16e8bf1352469b475e5e1c5d2318801fc5fe01",
+                "url": "https://api.github.com/repos/ez-php/testing-application/zipball/7270b2a85a55f84a0d99be3074263ee020c15b19",
+                "reference": "7270b2a85a55f84a0d99be3074263ee020c15b19",
                 "shasum": ""
             },
             "require": {
@@ -1193,7 +1193,7 @@
                 "issues": "https://github.com/ez-php/testing-application/issues",
                 "source": "https://github.com/ez-php/testing-application"
             },
-            "time": "2026-09-26T02:22:08+00:00"
+            "time": "2026-09-30T16:51:49+00:00"
         },
         {
             "name": "ez-php/validation",
