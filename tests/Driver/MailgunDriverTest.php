@@ -167,7 +167,7 @@ final class MailgunDriverTest extends TestCase
             ->attach('/nonexistent/path/does-not-exist.txt', 'x.txt');
 
         $this->expectException(MailException::class);
-        $this->expectExceptionMessageMatches('/Attachment not readable/');
+        $this->expectExceptionMessageMatches('/Cannot read attachment/');
 
         $this->buildFields($driver, $mailable);
     }

@@ -226,6 +226,25 @@ class Mailable
     }
 
     /**
+     * Add an in-memory attachment — generated content (a rendered PDF, a file
+     * read through ez-php/storage, AI media output) without a temp file.
+     *
+     * @param string $content  Raw attachment bytes.
+     * @param string $name     Display filename shown to the recipient.
+     * @param string $mimeType MIME type, e.g. 'application/pdf'.
+     *
+     * @throws MailException When $name is empty.
+     *
+     * @return static
+     */
+    public function attachData(string $content, string $name, string $mimeType = 'application/octet-stream'): static
+    {
+        $this->attachments[] = Attachment::fromData($content, $name, $mimeType);
+
+        return $this;
+    }
+
+    /**
      * Return the recipient address.
      *
      * @return string

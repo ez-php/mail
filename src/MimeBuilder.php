@@ -114,7 +114,7 @@ final class MimeBuilder
     /**
      * Build a single base64-encoded attachment MIME part.
      *
-     * @param Attachment $attachment File to encode.
+     * @param Attachment $attachment File or in-memory content to encode.
      * @param string     $boundary   Surrounding MIME boundary token.
      *
      * @throws MailException If the file cannot be read.
@@ -123,29 +123,61 @@ final class MimeBuilder
      */
     private function attachmentPart(Attachment $attachment, string $boundary): string
     {
-        $path = $attachment->getPath();
-
-        if (!is_readable($path)) {
-            throw new MailException("Cannot read attachment file: {$path}");
-        }
-
-        $content = file_get_contents($path);
-
-        if ($content === false) {
-            throw new MailException("Cannot read attachment file: {$path}");
-        }
-
-        $name = $attachment->getName();
-        $encoded = chunk_split(base64_encode($content), 76, "\r\n");
-        $mime = mime_content_type($path);
-        $mime = is_string($mime) && $mime !== '' ? $mime : 'application/octet-stream';
+        $name = $this->stripHeaderInjection($attachment->getName());
+        $encoded = chunk_split(base64_encode($attachment->getContent()), 76, "\r\n");
+        $mime = $this->safeMimeType($attachment->getMimeType());
 
         return "--{$boundary}\r\n"
-            . "Content-Type: {$mime}; name=\"{$name}\"\r\n"
+            . "Content-Type: {$mime}; name=\"" . $this->quoteParameter($this->encodeHeader($name)) . "\"\r\n"
             . "Content-Transfer-Encoding: base64\r\n"
-            . "Content-Disposition: attachment; filename=\"{$name}\"\r\n"
+            . 'Content-Disposition: attachment; ' . $this->filenameParameter($name) . "\r\n"
             . "\r\n"
             . $encoded;
+    }
+
+    /**
+     * Return the MIME type when it is a plain `type/subtype` token pair, else
+     * `application/octet-stream` — the value comes from the caller (or an
+     * upload's client-supplied type) and is interpolated into a header line.
+     *
+     * @param string $mime Raw MIME type.
+     *
+     * @return string
+     */
+    private function safeMimeType(string $mime): string
+    {
+        return preg_match('~^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$~', $mime) === 1
+            ? $mime
+            : 'application/octet-stream';
+    }
+
+    /**
+     * The Content-Disposition `filename` parameter: a quoted string for ASCII
+     * names, RFC 2231 `filename*=UTF-8''…` percent-encoding otherwise.
+     *
+     * @param string $name Filename with control characters already stripped.
+     *
+     * @return string
+     */
+    private function filenameParameter(string $name): string
+    {
+        if (preg_match('/^[\x20-\x7E]*$/', $name) === 1) {
+            return 'filename="' . $this->quoteParameter($name) . '"';
+        }
+
+        return "filename*=UTF-8''" . rawurlencode($name);
+    }
+
+    /**
+     * Escape `\` and `"` for use inside an RFC 2045 quoted-string parameter.
+     *
+     * @param string $value
+     *
+     * @return string
+     */
+    private function quoteParameter(string $value): string
+    {
+        return addcslashes($value, '"\\');
     }
 
     /**

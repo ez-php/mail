@@ -86,9 +86,9 @@ Authentication is AUTH LOGIN; omit `MAIL_USERNAME` to skip authentication.
 
 ```dotenv
 MAIL_DRIVER=mailgun
-MAIL_MAILGUN_DOMAIN=mg.example.com
-MAIL_MAILGUN_API_KEY=key-xxxxxxxxxxxxxxxxxxxx
-MAIL_MAILGUN_REGION=us           # us (default) or eu
+MAILGUN_DOMAIN=mg.example.com
+MAILGUN_SECRET=key-xxxxxxxxxxxxxxxxxxxx
+MAILGUN_REGION=us           # us (default) or eu
 MAIL_FROM_ADDRESS=noreply@example.com
 MAIL_FROM_NAME="My App"
 ```
@@ -99,7 +99,7 @@ Delivers via the Mailgun HTTP API v3. US region uses `api.mailgun.net`; EU regio
 
 ```dotenv
 MAIL_DRIVER=sendgrid
-MAIL_SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxx
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxx
 MAIL_FROM_ADDRESS=noreply@example.com
 MAIL_FROM_NAME="My App"
 ```
@@ -142,6 +142,9 @@ class InvoiceMail extends Mailable
              ->attach($invoicePath);
     }
 }
+
+// Generated content — no temp file needed (rendered PDF, ez-php/storage file, ...)
+$mail->attachData($pdfBytes, 'Invoice-2026-01.pdf', 'application/pdf');
 ```
 
 ### Methods
@@ -154,6 +157,7 @@ class InvoiceMail extends Mailable
 | `text(string $body)` | Set plain-text body |
 | `html(string $body)` | Set HTML body |
 | `attach(string $path, string $name = '')` | Add file attachment |
+| `attachData(string $content, string $name, string $mimeType = 'application/octet-stream')` | Add an in-memory attachment (no temp file) |
 
 Combining `text()` and `html()` produces a `multipart/alternative` message. Adding attachments wraps the content in `multipart/mixed`.
 

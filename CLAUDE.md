@@ -275,8 +275,8 @@ src/
 ├── MailerInterface.php         — contract: send(Mailable): void
 ├── MailViewInterface.php       — adapter contract for rendering view templates into HTML bodies; optional ez-php/view integration
 ├── MailException.php           — base exception for all mail errors
-├── Mailable.php                — fluent builder: to(), from(), subject(), text(), html(), attach()
-├── Attachment.php              — immutable value object: file path + display name
+├── Mailable.php                — fluent builder: to(), from(), subject(), text(), html(), attach(), attachData()
+├── Attachment.php              — immutable value object: file path or in-memory bytes (fromData()) + display name + MIME type; getContent()/getMimeType()
 ├── MimeBuilder.php             — RFC 2822 / MIME message encoder (text, html, multipart, attachments)
 ├── Mail.php                    — static facade; delegates to injected MailerInterface singleton
 ├── MailServiceProvider.php     — binds MailerInterface (config-driven), wires Mail facade in boot()
@@ -284,23 +284,32 @@ src/
 │   └── SendMailableJob.php     — ez-php/queue Job wrapper delivering a pre-built Mailable via Mail::send() (soft dependency — require-dev only)
 └── Driver/
     ├── SmtpDriver.php          — native SMTP via stream_socket_client(); no external library
-    ├── MailgunDriver.php       — Mailgun v3 REST API via cURL; no third-party SDK; supports US + EU regions; `mail.timeout` total + 10 s connect timeout
-    ├── SendGridDriver.php      — SendGrid v3 Mail Send API via cURL; bearer token auth; attachments base64-encoded; `mail.timeout` total + 10 s connect timeout
+    ├── Http/
+    │   ├── ApiTransportInterface.php — HTTP seam of the API drivers: post(url, body, headers, basicAuth, timeout, connectTimeout) → ApiResponse
+    │   ├── ApiResponse.php     — status/body/transport error; assertDelivered() throws MailException on error, missing body or non-2xx
+    │   └── CurlApiTransport.php — default ApiTransportInterface on ext-curl
+    ├── MailgunDriver.php       — Mailgun v3 REST API through ApiTransportInterface; no third-party SDK; supports US + EU regions; `mail.timeout` total + 10 s connect timeout
+    ├── SendGridDriver.php      — SendGrid v3 Mail Send API through ApiTransportInterface; bearer token auth; attachments base64-encoded; `mail.timeout` total + 10 s connect timeout
     ├── LogDriver.php           — writes human-readable summaries to a log file
     └── NullDriver.php          — silently discards all messages
 
 tests/
 ├── TestCase.php                — base PHPUnit test case
-├── AttachmentTest.php          — covers Attachment: getPath, getName fallback to basename
+├── AttachmentTest.php          — covers Attachment: getPath, getName fallback to basename, fromData(), getContent()/getMimeType()
 ├── MailableTest.php            — covers Mailable: all setters, getters, attach accumulation, chaining
-├── MimeBuilderTest.php         — covers MimeBuilder: text, HTML, multipart/alternative, multipart/mixed, encoding
+├── MimeBuilderTest.php         — covers MimeBuilder: text, HTML, multipart/alternative, multipart/mixed, encoding, header injection via address/subject/attachment name/MIME type
 ├── MailTest.php                — covers Mail facade: delegation, uninitialized throw, reset, replacement
 ├── MailTimeoutWiringTest.php   — `mail.timeout` reaches smtp/mailgun/sendgrid (default 30); HTTP drivers set total + connect timeouts
+├── Support/
+│   └── mail-api-server.php     — router of MailCurlApiTransportTest's loopback server (`/echo`, `/status/<code>`, `/slow`)
 ├── Job/
 │   └── SendMailableJobTest.php — covers handle() delegation to Mail::send(), default queue/maxTries via a spy MailerInterface
 └── Driver/
     ├── NullDriverTest.php      — covers NullDriver: no exception, no output
     ├── LogDriverTest.php       — covers LogDriver: file write, append, directory creation, field format
+    ├── MailFakeApiTransport.php — recording ApiTransportInterface returning a canned ApiResponse (helper, uniquely named)
+    ├── MailApiDriverDeliveryTest.php — send() of Mailgun/SendGrid via the fake transport: request shape, transport error, non-2xx, missing body, in-memory attachments
+    ├── MailCurlApiTransportTest.php — CurlApiTransport against a `php -S` loopback server: headers, basic auth, multipart, status passthrough, connection error, timeout
     ├── MailgunDriverTest.php   — covers buildFields() via Reflection: from/to/subject/text/html, attachments, unreadable-file error
     ├── SendGridDriverTest.php  — covers buildPayload() via Reflection: from/to/subject/content, attachments, unreadable-file error
     └── SmtpDriverTest.php      — covers connection-failure exceptions (unit) + full delivery (Mailpit integration, group "mailpit")
@@ -334,6 +343,7 @@ Fluent builder for outgoing messages. All setter methods return `static` for inh
 | `text(string $body)` | Set plain-text body |
 | `html(string $body)` | Set HTML body |
 | `attach(string $path, string $name = '')` | Add a file attachment |
+| `attachData(string $content, string $name, string $mimeType = 'application/octet-stream')` | Add an in-memory attachment (rendered PDF, `ez-php/storage` file, AI media output) — no temp file |
 
 Combining `text()` and `html()` signals `MimeBuilder` to produce a `multipart/alternative` message. Adding attachments signals a `multipart/mixed` wrapper.
 
@@ -353,8 +363,9 @@ MIME construction logic:
 | Any above + files   | `multipart/mixed` wrapping the inner type |
 
 Non-ASCII subjects and display names are encoded with RFC 2047 (`=?UTF-8?B?...?=`).
+Every value interpolated into a header line has CR/LF and other control characters stripped first (header injection) — addresses, display names, the subject, and the attachment filename. The attachment's `name=`/`filename=` parameters are quoted with `\` and `"` escaped; a non-ASCII filename is sent as RFC 2047 in `name=` and RFC 2231 `filename*=UTF-8''…` in `Content-Disposition`. A MIME type that is not a plain `type/subtype` token pair becomes `application/octet-stream`.
 Attachment bodies are base64-encoded with 76-character line wrapping.
-MIME type detection uses PHP's `mime_content_type()` with `application/octet-stream` fallback.
+MIME type: an in-memory attachment's explicit type; for files, `mime_content_type()` with `application/octet-stream` fallback (`Attachment::getMimeType()`).
 
 ---
 
@@ -387,7 +398,7 @@ Authentication uses HTTP Basic auth with `api` as the username and the private A
 
 Constructor parameters: `$domain`, `$apiKey`, `$fromAddress`, `$fromName`, `$region = 'us'`.
 
-Like `SendGridDriver`, `send()` itself talks directly to `curl_*` functions (no `TransportInterface` seam), so it cannot be unit-tested without a live account — but the private `buildFields()` method that constructs the multipart form fields is pure (aside from reading attachment files) and is unit-tested via Reflection in `MailgunDriverTest`, covering exactly the "malformed payload" risk that matters most. Integration-test full delivery against a Sandbox domain or use the `LogDriver` during development.
+`send()` posts through an `ApiTransportInterface` (default `CurlApiTransport`, optional last constructor argument), so `MailApiDriverDeliveryTest` covers the request and the failure paths (transport error, non-2xx, missing body) with a fake transport; `buildFields()` is unit-tested via Reflection in `MailgunDriverTest`. In-memory attachments go up as `CURLStringFile`. Real delivery still needs a Sandbox domain — or use the `LogDriver` during development.
 
 ---
 
@@ -408,7 +419,7 @@ Attachments are base64-encoded and sent inline in the JSON payload.
 
 Constructor parameters: `$apiKey`, `$fromAddress`, `$fromName`.
 
-Like `MailgunDriver`, `send()` itself talks directly to `curl_*` functions (no `TransportInterface` seam), so it cannot be unit-tested without a live account — but the private `buildPayload()`/`buildAttachments()` methods that construct the JSON body are pure (aside from reading attachment files) and are unit-tested via Reflection in `SendGridDriverTest`, covering exactly the "malformed payload" risk that matters most. Integration-test full delivery against a verified Sender identity or use the `LogDriver` during development.
+Like `MailgunDriver`, `send()` posts through an `ApiTransportInterface`, so the request and failure paths are covered by `MailApiDriverDeliveryTest`; `buildPayload()`/`buildAttachments()` are unit-tested via Reflection in `SendGridDriverTest`. Real delivery still needs a verified Sender identity — or use the `LogDriver` during development.
 
 Config keys: `mail.sendgrid_api_key`, `mail.from_address`, `mail.from_name`.
 
@@ -456,6 +467,8 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 - **`NullDriver` as the default** — Fail-open is correct for mail: missing config should cause messages to be silently dropped rather than throwing at boot time. Developers opt into real delivery explicitly.
 - **`Mail::send()` throws when uninitialised** — Fail-fast at runtime is preferable to silent discards. A missing `MailServiceProvider` registration becomes immediately visible in development.
 - **No `Mail::to()` factory method** — Keeping `Mailable` construction out of the facade makes the entry point unambiguous: `new Mailable()` or a subclass. The facade's only responsibility is delegation.
+- **The API drivers share an `ApiTransportInterface` seam, not `ez-php/http-client`** — the module's only runtime dependency stays `ez-php/contracts`; the seam is three small classes under `Driver/Http/` and exists so the failure handling (`ApiResponse::assertDelivered()`) is testable.
+- **In-memory attachments live on `Attachment`, not in each driver** — `Attachment` carries either a path or raw bytes plus an explicit MIME type, and exposes `getContent()`/`getMimeType()`, so `MimeBuilder` and `SendGridDriver` encode both kinds identically; `MailgunDriver` streams files as `CURLFile` and bytes as `CURLStringFile`. `attach()` is unchanged.
 - **`is_readable()` before `file_get_contents()`** — Avoids the PHP `E_WARNING` emitted when `file_get_contents()` fails on a missing or unreadable file. The explicit `is_readable()` check throws a typed `MailException` without triggering engine-level warnings.
 - **`ez-php/queue` is a soft dependency, `require-dev` only.** `Job\SendMailableJob` extends `EzPhp\Queue\Job`, but `composer.json`'s `require` block stays limited to `ez-php/contracts` — a module that pulls in `ez-php/queue` as a hard dependency would force it on every application that installs `ez-php/mail`, even ones with no queue. PSR-4 autoloading only resolves `SendMailableJob.php` (and therefore `EzPhp\Queue\Job`) when something actually references the class, so the file can ship in `src/` without breaking `ez-php/mail`'s standalone use. Applications that want it must have `ez-php/queue` installed themselves.
 
@@ -463,8 +476,8 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 
 ## Testing Approach
 
-- **No external infrastructure** — All tests run in-process. `LogDriverTest` writes to a temp file (created inline, deleted in `tearDown`).
-- **`MailgunDriverTest`/`SendGridDriverTest` use Reflection on the private payload-builder method** — `buildFields()`/`buildPayload()` are the only pure (I/O-free apart from reading local attachment files) parts of these drivers; `send()` itself calls `curl_*` directly with no seam to fake, so it cannot be unit-tested. `new \ReflectionMethod($driver, 'buildFields')->invoke($driver, $mailable)` exercises exactly the payload-construction logic that would otherwise only be caught against a live account.
+- **No external infrastructure except Mailpit for `SmtpDriverTest`** — every other test runs in-process (the delivery tests of `SmtpDriverTest` need Mailpit and skip without it, see below). `LogDriverTest` writes to a temp file (created inline, deleted in `tearDown`).
+- **API drivers are tested on two levels** — `MailgunDriverTest`/`SendGridDriverTest` call the private payload builders (`buildFields()`/`buildPayload()`) via Reflection; `MailApiDriverDeliveryTest` drives `send()` through `MailFakeApiTransport`, a recording `ApiTransportInterface`, to cover the request shape and every failure path without a live account. `CurlApiTransport` itself is tested against a `php -S` loopback server started by `MailCurlApiTransportTest` (`tests/Support/mail-api-server.php`) — still no external network.
 - **`SmtpDriver` is integration-tested, not unit-tested** — delivery needs a live SMTP server, so `SmtpDriverTest` runs against Mailpit when `MAILPIT_HOST` is set (CI `test` job, local Docker) and skips otherwise; the compatibility matrix runs without Mailpit.
 - **`SpyMailer` named class** — `MailTest` uses a file-scope named class `SpyMailer implements MailerInterface` with a `getSent()` getter. Anonymous classes with reference-backed private properties confuse PHPStan's `property.onlyWritten` check.
 - **`Mail::resetMailer()` in setUp/tearDown** — Required in any test touching the `Mail` facade to prevent state leaking between test classes.

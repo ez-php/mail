@@ -102,6 +102,21 @@ final class MimeBuilderTest extends TestCase
         }
     }
 
+    public function testInMemoryAttachmentIsEncodedWithItsExplicitMimeType(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject('Invoice')
+            ->text('see attachment')
+            ->attachData('%PDF-1.7 bytes', 'invoice.pdf', 'application/pdf');
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        $this->assertStringContainsString('Content-Type: application/pdf; name="invoice.pdf"', $message);
+        $this->assertStringContainsString('Content-Disposition: attachment; filename="invoice.pdf"', $message);
+        $this->assertStringContainsString(base64_encode('%PDF-1.7 bytes'), $message);
+    }
+
     public function testAttachmentThrowsWhenFileNotReadable(): void
     {
         $mailable = (new Mailable())
@@ -248,5 +263,65 @@ final class MimeBuilderTest extends TestCase
 
         $this->assertStringNotContainsString("\r\nBcc:", $message);
         $this->assertSame(1, substr_count($message, "\r\n\r\n"), 'exactly one header/body separator');
+    }
+
+    public function testAttachmentNameCannotInjectAdditionalHeaders(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject('Upload')
+            ->text('body')
+            ->attachData('data', "evil.txt\"\r\nBcc: attacker@evil.com\r\nX-Injected: 1", 'text/plain');
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        $this->assertStringNotContainsString("\r\nBcc:", $message);
+        $this->assertStringNotContainsString("\r\nX-Injected:", $message);
+        $this->assertStringContainsString(
+            'Content-Disposition: attachment; filename="evil.txt\"Bcc: attacker@evil.comX-Injected: 1"',
+            $message,
+        );
+    }
+
+    public function testAttachmentMimeTypeCannotInjectAdditionalHeaders(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject('Upload')
+            ->text('body')
+            ->attachData('data', 'report.pdf', "application/pdf\r\nBcc: attacker@evil.com");
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        $this->assertStringNotContainsString("\r\nBcc:", $message);
+        $this->assertStringContainsString('Content-Type: application/octet-stream; name="report.pdf"', $message);
+    }
+
+    public function testAttachmentNameQuotesAndBackslashesAreEscaped(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject('Upload')
+            ->text('body')
+            ->attachData('data', 'a"b\\c.txt', 'text/plain');
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        $this->assertStringContainsString('filename="a\"b\\\\c.txt"', $message);
+    }
+
+    public function testNonAsciiAttachmentNameIsEncoded(): void
+    {
+        $mailable = (new Mailable())
+            ->to('user@example.com')
+            ->subject('Upload')
+            ->text('body')
+            ->attachData('data', 'Bericht-Ä.pdf', 'application/pdf');
+
+        $message = $this->builder->build($mailable, 'from@example.com', '');
+
+        $this->assertStringContainsString('name="=?UTF-8?B?' . base64_encode('Bericht-Ä.pdf') . '?="', $message);
+        $this->assertStringContainsString("filename*=UTF-8''Bericht-%C3%84.pdf", $message);
+        $this->assertStringNotContainsString('Ä', $message);
     }
 }

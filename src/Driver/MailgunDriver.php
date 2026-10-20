@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace EzPhp\Mail\Driver;
 
 use CURLFile;
-use CurlHandle;
+use CURLStringFile;
+use EzPhp\Mail\Driver\Http\ApiTransportInterface;
+use EzPhp\Mail\Driver\Http\CurlApiTransport;
 use EzPhp\Mail\Mailable;
 use EzPhp\Mail\MailerInterface;
 use EzPhp\Mail\MailException;
@@ -25,15 +27,18 @@ use EzPhp\Mail\MailException;
  *
  * Attachments are sent as multipart/form-data file fields named attachment[0],
  * attachment[1], etc. Mailgun accepts indexed array notation for multiple files.
+ * In-memory attachments (Mailable::attachData()) go up as CURLStringFile.
  *
- * This driver is not covered by automated unit tests — a live Mailgun account
- * (or Mailgun Sandbox domain) is required. Integration-test it against a Sandbox
- * domain or use the LogDriver during development.
+ * The HTTP request goes through an ApiTransportInterface (CurlApiTransport by
+ * default), so the error paths are unit-tested with a fake transport; real
+ * delivery still needs a Mailgun account or Sandbox domain.
  *
  * @package EzPhp\Mail\Driver
  */
 final class MailgunDriver implements MailerInterface
 {
+    private readonly ApiTransportInterface $transport;
+
     /**
      * @param string $domain      Mailgun sending domain (e.g. 'mail.example.com').
      * @param string $apiKey      Mailgun private API key (starts with 'key-').
@@ -42,6 +47,7 @@ final class MailgunDriver implements MailerInterface
      * @param string $region      API region: 'us' (default) or 'eu'.
      * @param int    $timeout     Total request timeout in seconds (`mail.timeout`).
      * @param int    $connectTimeout Connection-phase timeout in seconds, so an unreachable API fails fast.
+     * @param ApiTransportInterface|null $transport HTTP transport; null = CurlApiTransport.
      */
     public function __construct(
         private readonly string $domain,
@@ -51,7 +57,9 @@ final class MailgunDriver implements MailerInterface
         private readonly string $region = 'us',
         private readonly int $timeout = 30,
         private readonly int $connectTimeout = 10,
+        ?ApiTransportInterface $transport = null,
     ) {
+        $this->transport = $transport ?? new CurlApiTransport();
     }
 
     /**
@@ -59,7 +67,7 @@ final class MailgunDriver implements MailerInterface
      *
      * @param Mailable $mailable
      *
-     * @throws MailException On cURL errors, unreadable attachments, or non-2xx responses.
+     * @throws MailException On transport errors, unreadable attachments, or non-2xx responses.
      *
      * @return void
      */
@@ -71,13 +79,9 @@ final class MailgunDriver implements MailerInterface
 
         $fields = $this->buildFields($mailable);
 
-        $ch = curl_init();
-
-        if ($ch === false) {
-            throw new MailException('Failed to initialise cURL handle');
-        }
-
-        $this->execute($ch, $endpoint, $fields);
+        $this->transport
+            ->post($endpoint, $fields, [], "api:{$this->apiKey}", $this->timeout, $this->connectTimeout)
+            ->assertDelivered('Mailgun');
     }
 
     /**
@@ -87,7 +91,7 @@ final class MailgunDriver implements MailerInterface
      *
      * @throws MailException When an attachment file is not readable.
      *
-     * @return array<string, string|CURLFile>
+     * @return array<string, string|CURLFile|CURLStringFile>
      */
     private function buildFields(Mailable $mailable): array
     {
@@ -114,9 +118,17 @@ final class MailgunDriver implements MailerInterface
         }
 
         foreach ($mailable->getAttachments() as $index => $attachment) {
+            $data = $attachment->getData();
+
+            if ($data !== null) {
+                $fields["attachment[{$index}]"] = new CURLStringFile($data, $attachment->getName(), $attachment->getMimeType());
+
+                continue;
+            }
+
             if (!is_readable($attachment->getPath())) {
                 throw new MailException(
-                    "Attachment not readable: {$attachment->getPath()}"
+                    "Cannot read attachment file: {$attachment->getPath()}"
                 );
             }
 
@@ -128,55 +140,5 @@ final class MailgunDriver implements MailerInterface
         }
 
         return $fields;
-    }
-
-    /**
-     * Total and connect timeouts for the API request.
-     *
-     * @return array<int, int>
-     */
-    private function timeoutOptions(): array
-    {
-        return [CURLOPT_TIMEOUT => $this->timeout, CURLOPT_CONNECTTIMEOUT => $this->connectTimeout];
-    }
-
-    /**
-     * Configure the cURL handle and execute the Mailgun API request.
-     *
-     * @param CurlHandle                     $ch       Initialised cURL handle.
-     * @param non-empty-string               $endpoint Full API URL.
-     * @param array<string, string|CURLFile> $fields   Form fields to POST.
-     *
-     * @throws MailException On cURL errors or non-2xx HTTP responses.
-     *
-     * @return void
-     */
-    private function execute(CurlHandle $ch, string $endpoint, array $fields): void
-    {
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $endpoint,
-            CURLOPT_USERPWD => "api:{$this->apiKey}",
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $fields,
-            CURLOPT_RETURNTRANSFER => true,
-        ] + $this->timeoutOptions());
-
-        $response = curl_exec($ch);
-        $statusCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-
-        if ($curlError !== '') {
-            throw new MailException("Mailgun delivery failed: {$curlError}");
-        }
-
-        if (!is_string($response)) {
-            throw new MailException('Mailgun returned an unexpected non-string response');
-        }
-
-        if ($statusCode < 200 || $statusCode >= 300) {
-            throw new MailException(
-                "Mailgun rejected the message (HTTP {$statusCode}): {$response}"
-            );
-        }
     }
 }

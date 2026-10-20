@@ -165,7 +165,7 @@ final class SendGridDriverTest extends TestCase
             ->attach('/nonexistent/path/does-not-exist.txt', 'x.txt');
 
         $this->expectException(MailException::class);
-        $this->expectExceptionMessageMatches('/Attachment not readable/');
+        $this->expectExceptionMessageMatches('/Cannot read attachment/');
 
         $this->buildPayload($driver, $mailable);
     }

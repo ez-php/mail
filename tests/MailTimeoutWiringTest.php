@@ -5,21 +5,24 @@ declare(strict_types=1);
 namespace Tests;
 
 use EzPhp\Contracts\ConfigInterface;
+use EzPhp\Mail\Driver\Http\ApiResponse;
 use EzPhp\Mail\Driver\MailgunDriver;
 use EzPhp\Mail\Driver\SendGridDriver;
 use EzPhp\Mail\Driver\SmtpDriver;
+use EzPhp\Mail\Mailable;
 use EzPhp\Mail\MailServiceProvider;
 use EzPhp\Mail\MimeBuilder;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Tests\Driver\MailFakeApiTransport;
 
 /**
  * Class MailTimeoutWiringTest
  *
- * `mail.timeout` reaches every network driver, and the HTTP drivers set both a
- * total and a connect timeout on their cURL handle. The builders and the option
- * list are private, so they are reached via Reflection (the drivers call curl_*
- * directly and have no transport seam).
+ * `mail.timeout` reaches every network driver, and the HTTP drivers pass both a
+ * total and a connect timeout to their transport. The provider's builders are
+ * private, so they are reached via Reflection; the timeouts are observed on a
+ * recording ApiTransportInterface.
  *
  * @package Tests
  */
@@ -28,6 +31,8 @@ use PHPUnit\Framework\Attributes\UsesClass;
 #[CoversClass(MailgunDriver::class)]
 #[UsesClass(SmtpDriver::class)]
 #[UsesClass(MimeBuilder::class)]
+#[UsesClass(Mailable::class)]
+#[UsesClass(ApiResponse::class)]
 final class MailTimeoutWiringTest extends TestCase
 {
     /**
@@ -105,15 +110,16 @@ final class MailTimeoutWiringTest extends TestCase
      */
     public function test_http_drivers_set_total_and_connect_timeouts(): void
     {
-        $drivers = [
-            new SendGridDriver('key', 'from@example.com', 'From', timeout: 15, connectTimeout: 4),
-            new MailgunDriver('mg.example.com', 'key', 'from@example.com', 'From', timeout: 15, connectTimeout: 4),
-        ];
+        $sendGridTransport = new MailFakeApiTransport();
+        $mailgunTransport = new MailFakeApiTransport();
+        $mailable = (new Mailable())->to('r@example.com')->subject('x')->text('body');
 
-        foreach ($drivers as $driver) {
-            $options = (new \ReflectionMethod($driver, 'timeoutOptions'))->invoke($driver);
+        (new SendGridDriver('key', 'from@example.com', 'From', timeout: 15, connectTimeout: 4, transport: $sendGridTransport))->send($mailable);
+        (new MailgunDriver('mg.example.com', 'key', 'from@example.com', 'From', timeout: 15, connectTimeout: 4, transport: $mailgunTransport))->send($mailable);
 
-            $this->assertSame([CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 4], $options, $driver::class);
+        foreach (['sendgrid' => $sendGridTransport, 'mailgun' => $mailgunTransport] as $name => $transport) {
+            $this->assertSame(15, $transport->requests[0]['timeout'], $name);
+            $this->assertSame(4, $transport->requests[0]['connectTimeout'], $name);
         }
     }
 }
