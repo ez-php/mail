@@ -296,8 +296,10 @@ src/
 
 tests/
 ├── TestCase.php                — base PHPUnit test case
+├── MailViewWiringTest.php  — boot() hands a bound MailViewInterface to Mailable, so view() renders without setViewRenderer()
+├── MailServiceProviderTest.php  — Smoke test: MailServiceProvider registers and boots its bindings in a minimal application context without error
 ├── AttachmentTest.php          — covers Attachment: getPath, getName fallback to basename, fromData(), getContent()/getMimeType()
-├── MailableTest.php            — covers Mailable: all setters, getters, attach accumulation, chaining
+├── MailableTest.php            — covers Mailable: all setters, getters, attach accumulation, chaining, view() through a renderer and without one
 ├── MimeBuilderTest.php         — covers MimeBuilder: text, HTML, multipart/alternative, multipart/mixed, encoding, header injection via address/subject/attachment name/MIME type
 ├── MailTest.php                — covers Mail facade: delegation, uninitialized throw, reset, replacement
 ├── MailTimeoutWiringTest.php   — `mail.timeout` reaches smtp/mailgun/sendgrid (default 30); HTTP drivers set total + connect timeouts
@@ -309,7 +311,7 @@ tests/
     ├── NullDriverTest.php      — covers NullDriver: no exception, no output
     ├── LogDriverTest.php       — covers LogDriver: file write, append, directory creation, field format
     ├── MailFakeApiTransport.php — recording ApiTransportInterface returning a canned ApiResponse (helper, uniquely named)
-    ├── MailApiDriverDeliveryTest.php — send() of Mailgun/SendGrid via the fake transport: request shape, transport error, non-2xx, missing body, in-memory attachments
+    ├── MailApiDriverDeliveryTest.php — send() of Mailgun/SendGrid via the fake transport: request shape, EU endpoints, transport error, non-2xx, missing body, in-memory attachments
     ├── MailCurlApiTransportTest.php — CurlApiTransport against a `php -S` loopback server: headers, basic auth, multipart, status passthrough, connection error, timeout
     ├── MailgunDriverTest.php   — covers buildFields() via Reflection: from/to/subject/text/html, attachments, unreadable-file error
     ├── SendGridDriverTest.php  — covers buildPayload() via Reflection: from/to/subject/content, attachments, unreadable-file error
@@ -413,16 +415,16 @@ Writes a one-line human-readable summary per message to a file path. The log dir
 
 Delivers mail via the SendGrid v3 Mail Send API using PHP's built-in cURL extension. No third-party library required.
 
-Endpoint: `https://api.sendgrid.com/v3/mail/send`
+Endpoint: `https://api.sendgrid.com/v3/mail/send`, or `https://api.eu.sendgrid.com/v3/mail/send` with `region: 'eu'` (EU data residency)
 Authentication: `Authorization: Bearer <api_key>` header.
 Request body: JSON with `personalizations`, `from`, `subject`, `content`, and optional `attachments`.
 Attachments are base64-encoded and sent inline in the JSON payload.
 
-Constructor parameters: `$apiKey`, `$fromAddress`, `$fromName`.
+Constructor parameters: `$apiKey`, `$fromAddress`, `$fromName`, then `$timeout`, `$connectTimeout`, `$transport` and `$region = 'us'` — the region is last so positional callers of the older signature keep working (Mailgun's sits after `$fromName` because it predates the timeouts).
 
 Like `MailgunDriver`, `send()` posts through an `ApiTransportInterface`, so the request and failure paths are covered by `MailApiDriverDeliveryTest`; `buildPayload()`/`buildAttachments()` are unit-tested via Reflection in `SendGridDriverTest`. Real delivery still needs a verified Sender identity — or use the `LogDriver` during development.
 
-Config keys: `mail.sendgrid_api_key`, `mail.from_address`, `mail.from_name`.
+Config keys: `mail.sendgrid_api_key`, `mail.sendgrid_region` (`us`/`eu`), `mail.from_address`, `mail.from_name`.
 
 ---
 

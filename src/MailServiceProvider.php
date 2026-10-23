@@ -160,6 +160,7 @@ final class MailServiceProvider extends ServiceProvider
     private function makeSendGridDriver(ConfigInterface $config): SendGridDriver
     {
         $apiKey = $config->get('mail.sendgrid_api_key');
+        $region = $config->get('mail.sendgrid_region');
         $fromAddress = $config->get('mail.from_address');
         $fromName = $config->get('mail.from_name');
 
@@ -168,6 +169,7 @@ final class MailServiceProvider extends ServiceProvider
             is_string($fromAddress) ? $fromAddress : '',
             is_string($fromName) ? $fromName : '',
             $this->timeout($config),
+            region: is_string($region) && $region !== '' ? $region : 'us',
         );
     }
 

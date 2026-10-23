@@ -100,6 +100,7 @@ Delivers via the Mailgun HTTP API v3. US region uses `api.mailgun.net`; EU regio
 ```dotenv
 MAIL_DRIVER=sendgrid
 SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxx
+SENDGRID_REGION=us   # or eu for accounts with EU data residency (api.eu.sendgrid.com)
 MAIL_FROM_ADDRESS=noreply@example.com
 MAIL_FROM_NAME="My App"
 ```
@@ -156,10 +157,35 @@ $mail->attachData($pdfBytes, 'Invoice-2026-01.pdf', 'application/pdf');
 | `subject(string $subject)` | Set subject line |
 | `text(string $body)` | Set plain-text body |
 | `html(string $body)` | Set HTML body |
+| `view(string $name, array $data = [])` | Render the HTML body from a template at send time (needs a bound `MailViewInterface`, see below) |
 | `attach(string $path, string $name = '')` | Add file attachment |
 | `attachData(string $content, string $name, string $mimeType = 'application/octet-stream')` | Add an in-memory attachment (no temp file) |
 
 Combining `text()` and `html()` produces a `multipart/alternative` message. Adding attachments wraps the content in `multipart/mixed`.
+
+### Template bodies with `view()`
+
+`view()` stores a template name and data; the HTML is rendered when the mail is built. Rendering goes through `MailViewInterface` (one method, `render(string $template, array $data = []): string`), so any template engine fits. Bind an implementation in a provider registered **before** `MailServiceProvider` — its `boot()` hands the bound renderer to `Mailable::setViewRenderer()`. With `ez-php/view`, a thin adapter over `ViewEngine::render()` is enough:
+
+```php
+use EzPhp\Mail\MailViewInterface;
+use EzPhp\View\ViewEngine;
+
+$this->app->bind(MailViewInterface::class, fn ($app) => new class ($app->make(ViewEngine::class)) implements MailViewInterface {
+    public function __construct(private readonly ViewEngine $views)
+    {
+    }
+
+    public function render(string $template, array $data = []): string
+    {
+        return $this->views->render($template, $data);
+    }
+});
+
+$mail = (new Mailable())->to('alice@example.com')->subject('Welcome')->view('emails.welcome', ['name' => 'Alice']);
+```
+
+`view()` takes precedence over `html()`. Without a bound renderer, building the mail throws `MailException`. Tests that call `Mailable::setViewRenderer()` themselves reset it with `Mailable::resetViewRenderer()`.
 
 ---
 

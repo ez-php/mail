@@ -32,6 +32,11 @@ final class SendGridDriver implements MailerInterface
 {
     private const string ENDPOINT = 'https://api.sendgrid.com/v3/mail/send';
 
+    /**
+     * Endpoint for accounts with EU data residency (subusers pinned to the EU region).
+     */
+    private const string EU_ENDPOINT = 'https://api.eu.sendgrid.com/v3/mail/send';
+
     private readonly ApiTransportInterface $transport;
 
     /**
@@ -41,6 +46,8 @@ final class SendGridDriver implements MailerInterface
      * @param int    $timeout        Total request timeout in seconds (`mail.timeout`).
      * @param int    $connectTimeout Connection-phase timeout in seconds, so an unreachable API fails fast.
      * @param ApiTransportInterface|null $transport HTTP transport; null = CurlApiTransport.
+     * @param string $region         API region: 'us' (default) or 'eu' (EU data residency). Last so
+     *                               positional callers of the older signature keep working.
      */
     public function __construct(
         private readonly string $apiKey,
@@ -49,6 +56,7 @@ final class SendGridDriver implements MailerInterface
         private readonly int $timeout = 30,
         private readonly int $connectTimeout = 10,
         ?ApiTransportInterface $transport = null,
+        private readonly string $region = 'us',
     ) {
         $this->transport = $transport ?? new CurlApiTransport();
     }
@@ -68,7 +76,7 @@ final class SendGridDriver implements MailerInterface
 
         $this->transport
             ->post(
-                self::ENDPOINT,
+                $this->region === 'eu' ? self::EU_ENDPOINT : self::ENDPOINT,
                 $body,
                 ['Authorization: Bearer ' . $this->apiKey, 'Content-Type: application/json', 'Accept: application/json'],
                 '',

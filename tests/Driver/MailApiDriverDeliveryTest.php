@@ -85,6 +85,15 @@ final class MailApiDriverDeliveryTest extends TestCase
         $this->assertSame('Hi', $decoded['subject']);
     }
 
+    public function test_sendgrid_eu_region_uses_the_eu_endpoint(): void
+    {
+        $transport = new MailFakeApiTransport(new ApiResponse(202, ''));
+
+        (new SendGridDriver('SG.key', 'f@example.com', 'F', transport: $transport, region: 'eu'))->send($this->mailable());
+
+        $this->assertSame('https://api.eu.sendgrid.com/v3/mail/send', $transport->requests[0]['url']);
+    }
+
     /**
      * @param \Closure(MailFakeApiTransport): (MailgunDriver|SendGridDriver) $factory
      */
