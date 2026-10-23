@@ -232,6 +232,14 @@ Mail::resetMailer();
 
 ---
 
+## Generating a Mailable
+
+```bash
+php ez make:mailable WelcomeMail
+```
+
+writes `app/Mail/WelcomeMail.php` — a `Mailable` subclass that configures recipient, subject and body in its constructor; send it with `Mail::send(new WelcomeMail($user->email, $user->name))`.
+
 ## Queue Integration
 
 Mail delivery is synchronous by default — `Mail::send()` blocks until the driver finishes. To dispatch mail asynchronously, push a `Job\SendMailableJob` (requires `ez-php/queue` to be installed — it's a soft dependency, declared only in `require-dev` here):

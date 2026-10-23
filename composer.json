@@ -29,7 +29,8 @@
     },
     "suggest": {
         "ext-curl": "Needed for Driver\\MailgunDriver and Driver\\SendGridDriver (HTTP API delivery)",
-        "ez-php/queue": "Needed for Job\\SendMailableJob (queued mail delivery)"
+        "ez-php/queue": "Needed for Job\\SendMailableJob (queued mail delivery)",
+        "ez-php/console": "Needed for the make:mailable command"
     },
     "require-dev": {
         "ez-php/docker": "^2.0",
@@ -39,7 +40,8 @@
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-deprecation-rules": "^2.0",
         "ez-php/testing-application": "^2.0",
-        "ez-php/queue": "^2.0"
+        "ez-php/queue": "^2.0",
+        "ez-php/console": "^2.0"
     },
     "autoload": {
         "psr-4": {

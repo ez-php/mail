@@ -7,6 +7,7 @@ namespace EzPhp\Mail;
 use EzPhp\Contracts\ConfigInterface;
 use EzPhp\Contracts\ContainerInterface;
 use EzPhp\Contracts\ServiceProvider;
+use EzPhp\Mail\Console\MakeMailableCommand;
 use EzPhp\Mail\Driver\LogDriver;
 use EzPhp\Mail\Driver\MailgunDriver;
 use EzPhp\Mail\Driver\NullDriver;
@@ -89,6 +90,9 @@ final class MailServiceProvider extends ServiceProvider
         } catch (\Throwable) {
             // MailViewInterface not configured — view() will throw on use
         }
+
+        // Needs ez-php/console (a suggest); registered by class name, loaded only when run.
+        $this->registerCommand(MakeMailableCommand::class);
     }
 
     /**

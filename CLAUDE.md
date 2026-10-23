@@ -280,7 +280,9 @@ src/
 ├── Attachment.php              — immutable value object: file path or in-memory bytes (fromData()) + display name + MIME type; getContent()/getMimeType()
 ├── MimeBuilder.php             — RFC 2822 / MIME message encoder (text, html, multipart, attachments)
 ├── Mail.php                    — static facade; delegates to injected MailerInterface singleton
-├── MailServiceProvider.php     — binds MailerInterface (config-driven), wires Mail facade in boot()
+├── MailServiceProvider.php     — binds MailerInterface (config-driven), wires Mail facade in boot(), registers make:mailable
+├── Console/
+│   └── MakeMailableCommand.php — `make:mailable <Name>`: writes app/Mail/<Name>.php, a Mailable subclass configured in its constructor
 ├── Job/
 │   └── SendMailableJob.php     — ez-php/queue Job wrapper delivering a pre-built Mailable via Mail::send() (soft dependency — require-dev only)
 └── Driver/
@@ -296,6 +298,8 @@ src/
 
 tests/
 ├── TestCase.php                — base PHPUnit test case
+├── Console/
+│   └── MakeMailableCommandTest.php — generated subclass (php -l), invalid names, existing file
 ├── MailViewWiringTest.php  — boot() hands a bound MailViewInterface to Mailable, so view() renders without setViewRenderer()
 ├── MailServiceProviderTest.php  — Smoke test: MailServiceProvider registers and boots its bindings in a minimal application context without error
 ├── AttachmentTest.php          — covers Attachment: getPath, getName fallback to basename, fromData(), getContent()/getMimeType()
@@ -450,6 +454,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 
 **`boot()`:**
 - Calls `Mail::setMailer($app->make(MailerInterface::class))` to wire the facade
+- Registers `make:mailable` (`ez-php/console` is a soft dependency, `suggest` + `require-dev`)
 
 ---
 
