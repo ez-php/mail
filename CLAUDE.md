@@ -500,7 +500,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 |---------|-----------------|
 | Template rendering (Blade, Twig, PHP views) | `ez-php/view` module |
 | Queue-backed async delivery beyond `Job\SendMailableJob` | Application layer builds richer queued-mail flows (retry policy tuning, batching, etc.) on top of the provided wrapper |
-| Bounce / delivery receipt handling | Application layer or a dedicated webhook handler |
+| Bounce / delivery receipt handling | `ez-php/mail-events` (Mailgun/SendGrid webhooks → `MailEvent`) |
 | Email validation rules | `ez-php/validation` (`email` rule) |
 | Bulk / newsletter sending | Application layer or a dedicated SDK |
 | HTML email CSS inlining | Application layer (use a dedicated library) |
