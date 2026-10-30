@@ -80,15 +80,11 @@ final class MailServiceProvider extends ServiceProvider
     {
         Mail::setMailer($this->app->make(MailerInterface::class));
 
-        // Wire view renderer when MailViewInterface is bound in the container.
-        // The try/catch handles the case where it is not configured — view() calls
-        // on Mailable will then throw MailException at send time with a clear message.
-        try {
-            /** @var MailViewInterface $renderer */
-            $renderer = $this->app->make(MailViewInterface::class);
-            Mailable::setViewRenderer($renderer);
-        } catch (\Throwable) {
-            // MailViewInterface not configured — view() will throw on use
+        // Wire the view renderer when MailViewInterface is bound. Not bound: view() on a
+        // Mailable throws MailException at send time with a clear message. Bound but
+        // failing: the error surfaces here instead of being reported as "not configured".
+        if ($this->app->has(MailViewInterface::class)) {
+            Mailable::setViewRenderer($this->app->make(MailViewInterface::class));
         }
 
         // Needs ez-php/console (a suggest); registered by class name, loaded only when run.

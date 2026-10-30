@@ -112,6 +112,10 @@ final readonly class MakeMailableCommand implements CommandInterface
              */
             final class $name extends Mailable
             {
+                /**
+                 * @param string \$address Recipient address
+                 * @param string \$name    Recipient display name
+                 */
                 public function __construct(string \$address, string \$name = '')
                 {
                     \$this->to(\$address, \$name)

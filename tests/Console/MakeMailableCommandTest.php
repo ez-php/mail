@@ -70,6 +70,8 @@ final class MakeMailableCommandTest extends TestCase
         $this->assertStringContainsString('Created: app/Mail/WelcomeMail.php', $output);
         $this->assertStringContainsString('namespace App\\Mail;', $source);
         $this->assertStringContainsString('final class WelcomeMail extends Mailable', $source);
+        // Generated code follows the guidelines: a docblock on every public method.
+        $this->assertSame(0, preg_match('/[^\/]\n\s*public function/', $source), 'public method without a docblock');
 
         exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file) . ' 2>&1', $lint, $status);
         $this->assertSame(0, $status, implode("\n", $lint));

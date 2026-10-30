@@ -151,7 +151,7 @@ php make_module.php <name> --description="..." --services=mysql,redis --extensio
 
 `<name>` is the kebab-case package name; the namespace is derived as
 `EzPhp\<PascalCase>` (each `-`-separated word upper-cased) unless `--namespace=`
-overrides it. Existing exceptions the guess gets wrong: `asyncapi` → `AsyncApi`,
+overrides it. Existing exceptions the guess gets wrong: `asyncapi` → `AsyncApi`, `asyncapi-ui` → `AsyncApiUi`,
 `bignum` → `BigNum`, `dataloader` → `DataLoader`, `dotenv` → `Env`, `graphql` → `GraphQL`, `graphql-subscriptions` → `GraphQLSubscriptions`, `oauth` → `OAuth`,
 `opcache` → `OPCache`, `openapi` → `OpenApi`, `qrcode` → `QrCode`, `swagger-ui` → `SwaggerUI`, `webauthn` → `WebAuthn` and
 `websocket` → `WebSocket`; `websocket-client` → `WebsocketClient`, `websocket-tls` → `WebsocketTls`,
@@ -301,6 +301,7 @@ tests/
 ├── Console/
 │   └── MakeMailableCommandTest.php — generated subclass (php -l), invalid names, existing file
 ├── MailViewWiringTest.php  — boot() hands a bound MailViewInterface to Mailable, so view() renders without setViewRenderer()
+├── MailViewFailingBindingTest.php — a bound MailViewInterface whose factory throws surfaces from boot(); no binding leaves view() failing at render time
 ├── MailServiceProviderTest.php  — Smoke test: MailServiceProvider registers and boots its bindings in a minimal application context without error
 ├── AttachmentTest.php          — covers Attachment: getPath, getName fallback to basename, fromData(), getContent()/getMimeType()
 ├── MailableTest.php            — covers Mailable: all setters, getters, attach accumulation, chaining, view() through a renderer and without one
@@ -454,6 +455,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 
 **`boot()`:**
 - Calls `Mail::setMailer($app->make(MailerInterface::class))` to wire the facade
+- Hands a bound `MailViewInterface` to `Mailable::setViewRenderer()` (checked with `has()`: not bound → `view()` fails at render time; bound but failing → the error surfaces from `boot()`)
 - Registers `make:mailable` (`ez-php/console` is a soft dependency, `suggest` + `require-dev`)
 
 ---
@@ -500,7 +502,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 |---------|-----------------|
 | Template rendering (Blade, Twig, PHP views) | `ez-php/view` module |
 | Queue-backed async delivery beyond `Job\SendMailableJob` | Application layer builds richer queued-mail flows (retry policy tuning, batching, etc.) on top of the provided wrapper |
-| Bounce / delivery receipt handling | `ez-php/mail-events` (Mailgun/SendGrid webhooks → `MailEvent`) |
+| Bounce / delivery receipt handling | `ez-php/mail-events` (Mailgun/SendGrid/Postmark/SES webhooks → `MailEvent`) |
 | Email validation rules | `ez-php/validation` (`email` rule) |
 | Bulk / newsletter sending | Application layer or a dedicated SDK |
 | HTML email CSS inlining | Application layer (use a dedicated library) |
