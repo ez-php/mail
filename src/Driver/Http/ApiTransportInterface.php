@@ -7,7 +7,7 @@ namespace EzPhp\Mail\Driver\Http;
 /**
  * Interface ApiTransportInterface
  *
- * The HTTP seam of the API mail drivers (MailgunDriver, SendGridDriver): one
+ * The HTTP seam of the API mail drivers (Mailgun, SendGrid, Postmark, SES): one
  * POST request in, the raw outcome out. The drivers build the request and
  * interpret the response; the transport only moves bytes. CurlApiTransport is
  * the production implementation; tests pass a fake to cover error paths

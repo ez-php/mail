@@ -35,7 +35,7 @@ return [
     'from_address' => getenv('MAIL_FROM_ADDRESS') ?: '',
     'from_name'    => getenv('MAIL_FROM_NAME') ?: '',
     'log_path'     => getenv('MAIL_LOG_PATH') ?: '',
-    'timeout'      => (int) (getenv('MAIL_TIMEOUT') ?: 30), // smtp, mailgun, sendgrid
+    'timeout'      => (int) (getenv('MAIL_TIMEOUT') ?: 30), // smtp, mailgun, sendgrid, postmark, ses
 ];
 ```
 
@@ -63,6 +63,8 @@ Mail::send(
 | SMTP     | `smtp`       | Delivers via a real SMTP server (RFC 5321, pure PHP) |
 | Mailgun  | `mailgun`    | Mailgun v3 REST API via cURL; no third-party SDK |
 | SendGrid | `sendgrid`   | SendGrid v3 Mail Send API via cURL; no third-party SDK |
+| Postmark | `postmark`   | Postmark Email API via cURL; no third-party SDK |
+| Amazon SES | `ses`      | SES v2 API via cURL with AWS Signature V4; no AWS SDK |
 | Log      | `log`        | Writes a summary to a log file; safe for dev/CI |
 | Null     | `null`       | Silently discards every message (default) |
 
@@ -106,6 +108,31 @@ MAIL_FROM_NAME="My App"
 ```
 
 Delivers via the SendGrid v3 Mail Send API. Attachments are base64-encoded and sent inline in the JSON payload.
+
+### Postmark
+
+```dotenv
+MAIL_DRIVER=postmark
+POSTMARK_TOKEN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx   # server token
+MAIL_FROM_ADDRESS=noreply@example.com
+MAIL_FROM_NAME="My App"
+```
+
+Delivers via the Postmark Email API. Attachments are base64-encoded and sent inline in the JSON payload.
+
+### Amazon SES
+
+```dotenv
+MAIL_DRIVER=ses
+SES_ACCESS_KEY_ID=AKIA...
+SES_SECRET_ACCESS_KEY=...
+SES_REGION=eu-west-1
+MAIL_FROM_ADDRESS=noreply@example.com
+MAIL_FROM_NAME="My App"
+```
+
+Delivers via the SES v2 API as a raw MIME message, signed with AWS Signature V4. The key pair needs
+`ses:SendEmail`. Temporary credentials (session tokens) are not supported.
 
 ### Log
 

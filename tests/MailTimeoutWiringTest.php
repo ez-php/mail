@@ -7,7 +7,9 @@ namespace Tests;
 use EzPhp\Contracts\ConfigInterface;
 use EzPhp\Mail\Driver\Http\ApiResponse;
 use EzPhp\Mail\Driver\MailgunDriver;
+use EzPhp\Mail\Driver\PostmarkDriver;
 use EzPhp\Mail\Driver\SendGridDriver;
+use EzPhp\Mail\Driver\SesDriver;
 use EzPhp\Mail\Driver\SmtpDriver;
 use EzPhp\Mail\Mailable;
 use EzPhp\Mail\MailServiceProvider;
@@ -29,6 +31,8 @@ use Tests\Driver\MailFakeApiTransport;
 #[CoversClass(MailServiceProvider::class)]
 #[CoversClass(SendGridDriver::class)]
 #[CoversClass(MailgunDriver::class)]
+#[CoversClass(PostmarkDriver::class)]
+#[CoversClass(SesDriver::class)]
 #[UsesClass(SmtpDriver::class)]
 #[UsesClass(MimeBuilder::class)]
 #[UsesClass(Mailable::class)]
@@ -67,7 +71,7 @@ final class MailTimeoutWiringTest extends TestCase
     {
         $provider = (new \ReflectionClass(MailServiceProvider::class))->newInstanceWithoutConstructor();
         $method = new \ReflectionMethod($provider, $builder);
-        $args = $builder === 'makeSmtpDriver' ? [$this->config($config), new MimeBuilder()] : [$this->config($config)];
+        $args = in_array($builder, ['makeSmtpDriver', 'makeSesDriver'], true) ? [$this->config($config), new MimeBuilder()] : [$this->config($config)];
 
         $driver = $method->invoke($provider, ...$args);
         self::assertIsObject($driver);
@@ -83,6 +87,27 @@ final class MailTimeoutWiringTest extends TestCase
     private function timeoutOf(object $driver): mixed
     {
         return (new \ReflectionProperty($driver, 'timeout'))->getValue($driver);
+    }
+
+    /**
+     * @return void
+     */
+    public function test_postmark_and_ses_builders_read_their_config(): void
+    {
+        $postmark = $this->build('makePostmarkDriver', ['mail.postmark_token' => 'tok', 'mail.timeout' => 12]);
+        $ses = $this->build('makeSesDriver', [
+            'mail.ses_key' => 'AKID',
+            'mail.ses_secret' => 'secret',
+            'mail.ses_region' => 'eu-west-1',
+            'mail.timeout' => 12,
+        ]);
+
+        $this->assertInstanceOf(PostmarkDriver::class, $postmark);
+        $this->assertSame('tok', (new \ReflectionProperty($postmark, 'token'))->getValue($postmark));
+        $this->assertSame(12, $this->timeoutOf($postmark));
+        $this->assertInstanceOf(SesDriver::class, $ses);
+        $this->assertSame('eu-west-1', (new \ReflectionProperty($ses, 'region'))->getValue($ses));
+        $this->assertSame(12, $this->timeoutOf($ses));
     }
 
     /**

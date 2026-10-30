@@ -265,7 +265,7 @@ When adding a new module, add `"$ROOT/modules/<name>"` to the `PACKAGES` array i
 
 # Package: ez-php/mail
 
-Transactional mail module for ez-php applications — pluggable drivers (SMTP, Mailgun, SendGrid, Log, Null), a fluent `Mailable` builder, RFC 2822 / MIME message construction, and a `Mail` static facade.
+Transactional mail module for ez-php applications — pluggable drivers (SMTP, Mailgun, SendGrid, Postmark, SES, Log, Null), a fluent `Mailable` builder, RFC 2822 / MIME message construction, and a `Mail` static facade.
 
 ---
 
@@ -290,9 +290,12 @@ src/
     ├── Http/
     │   ├── ApiTransportInterface.php — HTTP seam of the API drivers: post(url, body, headers, basicAuth, timeout, connectTimeout) → ApiResponse
     │   ├── ApiResponse.php     — status/body/transport error; assertDelivered() throws MailException on error, missing body or non-2xx
-    │   └── CurlApiTransport.php — default ApiTransportInterface on ext-curl
+    │   ├── CurlApiTransport.php — default ApiTransportInterface on ext-curl
+    │   └── SigV4Signer.php      — AWS Signature V4 for a JSON POST (host + x-amz-date signed)
     ├── MailgunDriver.php       — Mailgun v3 REST API through ApiTransportInterface; no third-party SDK; supports US + EU regions; `mail.timeout` total + 10 s connect timeout
     ├── SendGridDriver.php      — SendGrid v3 Mail Send API through ApiTransportInterface; bearer token auth; attachments base64-encoded; `mail.timeout` total + 10 s connect timeout
+    ├── PostmarkDriver.php      — Postmark Email API through ApiTransportInterface; server-token header; attachments base64-encoded
+    ├── SesDriver.php           — SES v2 API through ApiTransportInterface; raw MIME from MimeBuilder; AWS Signature V4
     ├── LogDriver.php           — writes human-readable summaries to a log file
     └── NullDriver.php          — silently discards all messages
 
@@ -320,6 +323,8 @@ tests/
     ├── MailCurlApiTransportTest.php — CurlApiTransport against a `php -S` loopback server: headers, basic auth, multipart, status passthrough, connection error, timeout
     ├── MailgunDriverTest.php   — covers buildFields() via Reflection: from/to/subject/text/html, attachments, unreadable-file error
     ├── SendGridDriverTest.php  — covers buildPayload() via Reflection: from/to/subject/content, attachments, unreadable-file error
+    ├── PostmarkDriverTest.php  — request shape through the fake transport, sender override, display-name quoting, attachments, rejection
+    ├── SesDriverTest.php       — SigV4 against the AWS test-suite `post-vanilla` vector, raw MIME payload, signed headers, region validation, rejection
     └── SmtpDriverTest.php      — covers connection-failure exceptions (unit) + full delivery (Mailpit integration, group "mailpit")
 ```
 
@@ -447,7 +452,7 @@ Static facade. Mirrors `Log` from `ez-php/logging`: `setMailer()` / `resetMailer
 
 ### MailServiceProvider (`src/MailServiceProvider.php`)
 
-Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (default).
+Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `postmark`, `ses`, `log`, `null` (default).
 
 **`register()`:**
 - Binds `MimeBuilder` (new instance each resolution)
@@ -487,6 +492,7 @@ Supported `mail.driver` values: `smtp`, `mailgun`, `sendgrid`, `log`, `null` (de
 ## Testing Approach
 
 - **No external infrastructure except Mailpit for `SmtpDriverTest`** — every other test runs in-process (the delivery tests of `SmtpDriverTest` need Mailpit and skip without it, see below). `LogDriverTest` writes to a temp file (created inline, deleted in `tearDown`).
+- **`SesDriver` has its own small SigV4 signer** — `ez-php/storage` signs S3 requests too, but with presigning, query strings and streaming payloads, and a shared class would make mail depend on storage. `SigV4Signer` covers one JSON POST and is pinned to an AWS test-suite vector. It sends `Content.Raw` from `MimeBuilder`, so attachments and header encoding match `SmtpDriver`. Static key pairs only.
 - **API drivers are tested on two levels** — `MailgunDriverTest`/`SendGridDriverTest` call the private payload builders (`buildFields()`/`buildPayload()`) via Reflection; `MailApiDriverDeliveryTest` drives `send()` through `MailFakeApiTransport`, a recording `ApiTransportInterface`, to cover the request shape and every failure path without a live account. `CurlApiTransport` itself is tested against a `php -S` loopback server started by `MailCurlApiTransportTest` (`tests/Support/mail-api-server.php`) — still no external network.
 - **`SmtpDriver` is integration-tested, not unit-tested** — delivery needs a live SMTP server, so `SmtpDriverTest` runs against Mailpit when `MAILPIT_HOST` is set (CI `test` job, local Docker) and skips otherwise; the compatibility matrix runs without Mailpit.
 - **`SpyMailer` named class** — `MailTest` uses a file-scope named class `SpyMailer implements MailerInterface` with a `getSent()` getter. Anonymous classes with reference-backed private properties confuse PHPStan's `property.onlyWritten` check.

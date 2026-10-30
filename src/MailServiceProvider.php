@@ -11,7 +11,9 @@ use EzPhp\Mail\Console\MakeMailableCommand;
 use EzPhp\Mail\Driver\LogDriver;
 use EzPhp\Mail\Driver\MailgunDriver;
 use EzPhp\Mail\Driver\NullDriver;
+use EzPhp\Mail\Driver\PostmarkDriver;
 use EzPhp\Mail\Driver\SendGridDriver;
+use EzPhp\Mail\Driver\SesDriver;
 use EzPhp\Mail\Driver\SmtpDriver;
 
 /**
@@ -24,6 +26,8 @@ use EzPhp\Mail\Driver\SmtpDriver;
  * - 'smtp'     — native SMTP via stream_socket_client()
  * - 'mailgun'  — Mailgun v3 REST API via cURL
  * - 'sendgrid' — SendGrid v3 Mail Send API via cURL
+ * - 'postmark' — Postmark Email API via cURL
+ * - 'ses'      — Amazon SES v2 API via cURL (AWS Signature V4)
  * - 'log'      — writes a human-readable summary to a log file
  * - 'null'     — silently discards all messages (default)
  *
@@ -64,6 +68,8 @@ final class MailServiceProvider extends ServiceProvider
                 'smtp' => $this->makeSmtpDriver($config, $mime),
                 'mailgun' => $this->makeMailgunDriver($config),
                 'sendgrid' => $this->makeSendGridDriver($config),
+                'postmark' => $this->makePostmarkDriver($config),
+                'ses' => $this->makeSesDriver($config, $mime),
                 'log' => $this->makeLogDriver($config),
                 default => new NullDriver(),
             };
@@ -174,7 +180,55 @@ final class MailServiceProvider extends ServiceProvider
     }
 
     /**
-     * Network timeout in seconds for the SMTP, Mailgun and SendGrid drivers (`mail.timeout`).
+     * Build a PostmarkDriver from the current config.
+     *
+     * @param ConfigInterface $config
+     *
+     * @return PostmarkDriver
+     */
+    private function makePostmarkDriver(ConfigInterface $config): PostmarkDriver
+    {
+        $token = $config->get('mail.postmark_token');
+        $fromAddress = $config->get('mail.from_address');
+        $fromName = $config->get('mail.from_name');
+
+        return new PostmarkDriver(
+            is_string($token) ? $token : '',
+            is_string($fromAddress) ? $fromAddress : '',
+            is_string($fromName) ? $fromName : '',
+            $this->timeout($config),
+        );
+    }
+
+    /**
+     * Build a SesDriver from the current config.
+     *
+     * @param ConfigInterface $config
+     * @param MimeBuilder     $mime
+     *
+     * @return SesDriver
+     */
+    private function makeSesDriver(ConfigInterface $config, MimeBuilder $mime): SesDriver
+    {
+        $key = $config->get('mail.ses_key');
+        $secret = $config->get('mail.ses_secret');
+        $region = $config->get('mail.ses_region');
+        $fromAddress = $config->get('mail.from_address');
+        $fromName = $config->get('mail.from_name');
+
+        return new SesDriver(
+            is_string($key) ? $key : '',
+            is_string($secret) ? $secret : '',
+            is_string($region) && $region !== '' ? $region : 'us-east-1',
+            $mime,
+            is_string($fromAddress) ? $fromAddress : '',
+            is_string($fromName) ? $fromName : '',
+            $this->timeout($config),
+        );
+    }
+
+    /**
+     * Network timeout in seconds for the SMTP, Mailgun, SendGrid, Postmark and SES drivers (`mail.timeout`).
      *
      * @param ConfigInterface $config
      *
